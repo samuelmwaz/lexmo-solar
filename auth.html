@@ -6,13 +6,13 @@
 <title>Lexmo Solar — Sign In</title>
 <link rel="stylesheet" href="shared.css">
 <style>
-body { overflow: hidden; }
+body { overflow: auto; }
 #bg-canvas { position:fixed; inset:0; z-index:0; opacity:.35; pointer-events:none; }
-.auth-wrap  { display:flex; min-height:100vh; position:relative; z-index:1; }
+.auth-wrap  { display:flex; min-height:100vh; position:relative; z-index:1; align-items:stretch; }
 
 .auth-left {
   width:55%; display:flex; flex-direction:column; justify-content:center;
-  padding:60px; position:relative; overflow:hidden;
+  padding:60px; position:relative; overflow:hidden; height:100vh; position:sticky; top:0;
 }
 .auth-left::after {
   content:''; position:absolute; right:0; top:0; bottom:0; width:1px;
@@ -41,8 +41,8 @@ body { overflow: hidden; }
   border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0;
 }
 
-.auth-right { width:45%; display:flex; align-items:center; justify-content:center; padding:40px 48px; }
-.auth-box   { width:100%; max-width:400px; }
+.auth-right { width:45%; display:flex; align-items:flex-start; justify-content:center; padding:40px 48px; overflow-y:auto; }
+.auth-box   { width:100%; max-width:400px; padding-bottom:40px; }
 
 .auth-tabs {
   display:flex; background:var(--surface2); border:1px solid var(--border);
@@ -143,7 +143,15 @@ body { overflow: hidden; }
   display:inline-block; vertical-align:middle; margin-right:6px;
 }
 @keyframes spin { to { transform:rotate(360deg); } }
-@media(max-width:768px){ .auth-left{ display:none; } .auth-right{ width:100%; padding:24px; } }
+@media(max-width:768px){
+  .auth-left { display:none; }
+  .auth-right { width:100%; padding:24px 18px; align-items:flex-start; min-height:100vh; }
+  .auth-box { padding-bottom:60px; }
+}
+@media(max-width:380px){
+  .auth-right { padding:20px 14px; }
+  .role-grid { grid-template-columns:1fr; }
+}
 </style>
 </head>
 <body>
