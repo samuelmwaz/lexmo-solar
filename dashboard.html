@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — Dashboard</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.sparkline { width:100%; height:50px; }
+.quick-link {
+  display:inline-flex; align-items:center; gap:6px; font-size:12px;
+  color:var(--accent); cursor:pointer; text-decoration:none;
+  font-family:var(--mono); margin-top:10px;
+}
+.quick-link:hover { opacity:.75; }
+.alert-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 0; border-bottom:1px solid rgba(26,45,74,.5); font-size:13px;
+}
+.alert-row:last-child { border-bottom:none; }
+</style>
+<!-- MOBILE_PATCH -->
+<style>
+@media(max-width:768px){
+  .quick-link { margin-top:6px; font-size:11px; }
+  #kpi-row .card { padding:14px; }
+}
+</style>
+</head>
+<body>
+<div id="offline-banner">⚠ OFFLINE MODE — changes are being cached locally</div>
+
+<nav class="navbar">
+  <div class="logo">LEXMO <span>SOLAR</span> // CMD</div>
+  <div class="nav-status">
+    <span><span class="online-dot"></span><span id="conn-status">Online</span></span>
+    <span class="admin-badge">👤 <span id="nav-username">—</span> · <span id="nav-role" style="color:var(--accent);font-size:11px">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">DASHBOARD</div>
+      <div class="page-sub">Overview — Lusaka, Zambia · <span id="clock"></span></div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="grid-4" id="kpi-row" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">Receivable</div>
+        <div class="big-number" style="color:var(--accent)" id="d-recv">—</div>
+        <div class="trend up" id="d-recv-sub">Income total</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Payable</div>
+        <div class="big-number" style="color:var(--danger)" id="d-pay">—</div>
+        <div class="trend down" id="d-pay-sub">Expense total</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Open Leads</div>
+        <div class="big-number" style="color:var(--accent2)" id="d-leads">—</div>
+        <div class="trend" id="d-leads-sub">Active pipeline</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Stock SKUs</div>
+        <div class="big-number" id="d-stock">—</div>
+        <div class="trend down" id="d-stock-sub">—</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Revenue sparkline -->
+      <div class="card">
+        <div class="card-title">Monthly Revenue (K)</div>
+        <svg class="sparkline" viewBox="0 0 300 50" preserveAspectRatio="none">
+          <polyline id="spark-line" points="" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <polyline id="spark-fill" points="" fill="rgba(0,230,118,.07)" stroke="none"/>
+        </svg>
+        <div class="trend up" style="margin-top:4px">↑ Trending up — 2025</div>
+        <a class="quick-link" href="accounting.html">View accounting →</a>
+      </div>
+
+      <!-- Inventory health -->
+      <div class="card">
+        <div class="card-title">Inventory Health</div>
+        <div id="inv-health"></div>
+        <a class="quick-link" href="inventory.html">Manage inventory →</a>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">⚠ Low Stock Alerts</div>
+        <div id="low-stock-alerts"><p style="color:var(--muted);font-size:13px">All stock healthy ✓</p></div>
+        <a class="quick-link" href="inventory.html">Go to inventory →</a>
+      </div>
+      <div class="card">
+        <div class="card-title">💰 Pending Invoices</div>
+        <div id="pending-invoices"><p style="color:var(--muted);font-size:13px">No pending invoices</p></div>
+        <a class="quick-link" href="accounting.html">Go to accounting →</a>
+      </div>
+    </div>
+
+    <!-- Recent leads -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="card-title" style="margin:0">Recent Leads</div>
+        <a class="quick-link" href="crm.html">View all →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Customer</th><th>Product Interest</th><th>Location</th><th>Stage</th><th>Est. Value</th></tr></thead>
+          <tbody id="dash-leads-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="card" style="margin-top:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="card-title" style="margin:0">Recent Transactions</div>
+        <a class="quick-link" href="accounting.html">View all →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Description</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody id="dash-tx-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="store.js"></script>
+<script src="shell.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  initNavbar();
+  renderShell('dashboard');
+  renderAll();
+});
+
+function onStoreUpdate() { renderAll(); }
+
+function renderAll() {
+  const inv  = storeGet('inventory')    || [];
+  const leads= storeGet('leads')        || [];
+  const txs  = storeGet('transactions') || [];
+
+  // KPIs
+  const income  = txs.filter(t=>t.type==='Income') .reduce((a,t)=>a+t.amount,0);
+  const expense = txs.filter(t=>t.type==='Expense').reduce((a,t)=>a+t.amount,0);
+  const lowStock= inv.filter(i=>i.qty<=i.min);
+  const pending = txs.filter(t=>t.status==='Pending');
+
+  document.getElementById('d-recv').textContent    = 'K'+income.toLocaleString();
+  document.getElementById('d-pay').textContent     = 'K'+expense.toLocaleString();
+  document.getElementById('d-leads').textContent   = leads.length;
+  document.getElementById('d-stock').textContent   = inv.length;
+  document.getElementById('d-stock-sub').textContent = lowStock.length+' low stock alert'+(lowStock.length!==1?'s':'');
+
+  // Inventory health bars
+  const maxQ = Math.max(...inv.map(i=>i.qty), 15);
+  document.getElementById('inv-health').innerHTML = inv.slice(0,4).map(item => {
+    const pct = Math.min(100, Math.round(item.qty/maxQ*100));
+    const col = item.qty===0?'var(--danger)':item.qty<=item.min?'var(--warning)':'var(--accent)';
+    return `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <span>${item.name}</span><span style="color:${col}">${item.qty} units</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="background:${col};width:${pct}%"></div></div>`;
+  }).join('');
+
+  // Low stock alerts
+  const lsEl = document.getElementById('low-stock-alerts');
+  lsEl.innerHTML = lowStock.length
+    ? lowStock.map(i=>`<div class="alert-row">
+        <span>${i.name} <span class="badge badge-yellow" style="margin-left:6px">Low: ${i.qty} left</span></span>
+        <a href="inventory.html" class="quick-link" style="margin:0">Restock →</a>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:13px">All stock healthy ✓</p>';
+
+  // Pending invoices
+  const piEl = document.getElementById('pending-invoices');
+  piEl.innerHTML = pending.length
+    ? pending.map(t=>`<div class="alert-row">
+        <span>${t.desc} <span class="badge badge-yellow" style="margin-left:6px">K${t.amount.toLocaleString()}</span></span>
+        <a href="accounting.html" class="quick-link" style="margin:0">View →</a>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:13px">No pending invoices</p>';
+
+  // Leads table
+  const stageMap = {Prospect:'badge-blue',Quoted:'badge-yellow',Negotiating:'badge-yellow',Won:'badge-green',Lost:'badge-red'};
+  document.getElementById('dash-leads-tbody').innerHTML = leads.slice(0,5).map(l=>`<tr>
+    <td><strong>${l.name}</strong></td>
+    <td>${l.product}</td><td>${l.location}</td>
+    <td><span class="badge ${stageMap[l.stage]||'badge-blue'}">${l.stage}</span></td>
+    <td style="color:var(--accent)">K${l.value.toLocaleString()}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">No leads yet</td></tr>';
+
+  // Transactions table
+  document.getElementById('dash-tx-tbody').innerHTML = txs.slice(0,5).map(t=>{
+    const col=t.type==='Income'?'var(--accent)':'var(--danger)';
+    const sc=t.status==='Paid'?'badge-green':t.status==='Pending'?'badge-yellow':'badge-red';
+    return `<tr>
+      <td>${t.desc}</td>
+      <td><span class="badge ${t.type==='Income'?'badge-green':'badge-red'}">${t.type}</span></td>
+      <td style="color:${col};font-family:var(--mono)">${t.type==='Income'?'+':'−'}K${t.amount.toLocaleString()}</td>
+      <td><span class="badge ${sc}">${t.status}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="color:var(--muted)">No transactions yet</td></tr>';
+
+  // Sparkline: income per transaction (simple simulation)
+  const pts = [40,30,35,15,22,10,5];
+  const line = pts.map((y,i)=>`${i*50},${y}`).join(' ');
+  document.getElementById('spark-line').setAttribute('points', line);
+  document.getElementById('spark-fill').setAttribute('points', line+' 300,50 0,50');
+}
+</script>
+</body>
+</html>

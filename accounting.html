@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — Accounting</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
+.bar-track { flex:1; height:8px; background:var(--surface2); border-radius:10px; overflow:hidden; }
+.bar-fill  { height:100%; border-radius:10px; transition:width .5s; }
+</style>
+<!-- MOBILE_PATCH -->
+<style>
+@media(max-width:768px){
+  .bar-row span:first-child { width:60px !important; font-size:11px; }
+  .bar-row span:last-child  { width:70px !important; font-size:11px; }
+  #tx-filter, #tx-search { width:100%; }
+  /* header row of transactions card */
+  .card > div[style*="justify-content:space-between"] { flex-direction:column; align-items:stretch; gap:8px; }
+  .card > div[style*="justify-content:space-between"] > div { display:flex; gap:8px; flex-wrap:wrap; }
+  .card > div[style*="justify-content:space-between"] .btn { flex:1; justify-content:center; }
+}
+</style>
+</head>
+<body>
+<div id="offline-banner">⚠ OFFLINE MODE — changes are being cached locally</div>
+
+<nav class="navbar">
+  <div class="logo">LEXMO <span>SOLAR</span> // CMD</div>
+  <div class="nav-status">
+    <span><span class="online-dot"></span><span id="conn-status">Online</span></span>
+    <span class="admin-badge">👤 <span id="nav-username">—</span> · <span id="nav-role" style="color:var(--accent);font-size:11px">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">ACCOUNTING</div>
+      <div class="page-sub">Financial overview and transactions · <span id="clock"></span></div>
+    </div>
+
+    <!-- KPI cards -->
+    <div class="grid-4">
+      <div class="card"><div class="card-title">Total Income</div><div class="big-number" style="color:var(--accent)" id="a-income">—</div><div class="trend up">Receivable</div></div>
+      <div class="card"><div class="card-title">Total Expenses</div><div class="big-number" style="color:var(--danger)" id="a-expense">—</div><div class="trend down">Payable</div></div>
+      <div class="card"><div class="card-title">Net Position</div><div class="big-number" id="a-net">—</div><div class="trend" id="a-net-t">—</div></div>
+      <div class="card"><div class="card-title">Pending</div><div class="big-number" style="color:var(--warning)" id="a-pending">—</div><div class="trend">Invoices awaiting</div></div>
+    </div>
+
+    <!-- Breakdown -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title">Income vs Expense Breakdown</div>
+      <div id="acct-breakdown"></div>
+    </div>
+
+    <!-- Transactions table -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div class="card-title" style="margin:0">Transactions</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="tx-filter" onchange="renderTransactions()" style="font-size:12px;padding:7px 10px">
+            <option value="">All</option>
+            <option>Income</option><option>Expense</option>
+            <option>Pending</option><option>Overdue</option>
+          </select>
+          <input type="text" id="tx-search" placeholder="Search…" oninput="renderTransactions()" style="font-size:12px;padding:7px 10px;width:160px">
+          <button class="btn btn-primary btn-sm" onclick="openModal('add-tx-modal')">+ Add Transaction</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Description</th><th>Type</th><th>Amount (K)</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="tx-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="add-tx-modal">
+  <div class="modal">
+    <div class="modal-title">+ ADD TRANSACTION</div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Description</label>
+      <input type="text" id="tx-desc" placeholder="e.g. Payment from client">
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Type</label>
+        <select id="tx-type"><option>Income</option><option>Expense</option></select>
+      </div>
+      <div class="form-group" style="flex:1"><label>Amount (K)</label><input type="number" id="tx-amount" min="0"></div>
+      <div class="form-group" style="flex:1"><label>Status</label>
+        <select id="tx-status"><option>Paid</option><option>Pending</option><option>Overdue</option></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('add-tx-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addTransaction()">Save Transaction</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal-overlay" id="edit-tx-modal">
+  <div class="modal">
+    <div class="modal-title">✏ EDIT TRANSACTION</div>
+    <input type="hidden" id="edit-tx-id">
+    <div class="form-group" style="margin-bottom:10px"><label>Description</label><input type="text" id="edit-tx-desc"></div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Type</label><select id="edit-tx-type"><option>Income</option><option>Expense</option></select></div>
+      <div class="form-group" style="flex:1"><label>Amount (K)</label><input type="number" id="edit-tx-amount"></div>
+      <div class="form-group" style="flex:1"><label>Status</label><select id="edit-tx-status"><option>Paid</option><option>Pending</option><option>Overdue</option></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('edit-tx-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditTx()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="store.js"></script>
+<script src="shell.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  initNavbar();
+  renderShell('accounting');
+  renderAll();
+});
+function onStoreUpdate(key){ if(key==='transactions') renderAll(); }
+
+function renderAll(){
+  const txs = storeGet('transactions')||[];
+  const income  = txs.filter(t=>t.type==='Income') .reduce((a,t)=>a+t.amount,0);
+  const expense = txs.filter(t=>t.type==='Expense').reduce((a,t)=>a+t.amount,0);
+  const net     = income-expense;
+  const pending = txs.filter(t=>t.status==='Pending').length;
+
+  document.getElementById('a-income').textContent  = 'K'+income.toLocaleString();
+  document.getElementById('a-expense').textContent = 'K'+expense.toLocaleString();
+  document.getElementById('a-net').textContent     = 'K'+Math.abs(net).toLocaleString();
+  document.getElementById('a-net').style.color     = net>=0?'var(--accent)':'var(--danger)';
+  document.getElementById('a-net-t').textContent   = net>=0?'↑ Positive':'↓ Negative';
+  document.getElementById('a-net-t').className     = 'trend '+(net>=0?'up':'down');
+  document.getElementById('a-pending').textContent = pending;
+
+  // Breakdown bar
+  const tot = income+expense||1;
+  document.getElementById('acct-breakdown').innerHTML=`
+    <div class="bar-row">
+      <span style="width:80px">Income</span>
+      <div class="bar-track"><div class="bar-fill" style="background:var(--accent);width:${income/tot*100}%"></div></div>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--accent);width:90px;text-align:right">K${income.toLocaleString()}</span>
+    </div>
+    <div class="bar-row">
+      <span style="width:80px">Expense</span>
+      <div class="bar-track"><div class="bar-fill" style="background:var(--danger);width:${expense/tot*100}%"></div></div>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--danger);width:90px;text-align:right">K${expense.toLocaleString()}</span>
+    </div>`;
+
+  renderTransactions();
+}
+
+function renderTransactions(){
+  const filter = document.getElementById('tx-filter').value;
+  const q      = document.getElementById('tx-search').value.toLowerCase();
+  let txs      = storeGet('transactions')||[];
+
+  if(filter==='Income')  txs=txs.filter(t=>t.type==='Income');
+  else if(filter==='Expense') txs=txs.filter(t=>t.type==='Expense');
+  else if(filter==='Pending') txs=txs.filter(t=>t.status==='Pending');
+  else if(filter==='Overdue') txs=txs.filter(t=>t.status==='Overdue');
+  if(q) txs=txs.filter(t=>t.desc.toLowerCase().includes(q));
+
+  const tbody = document.getElementById('tx-table');
+  if(!txs.length){ tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center">No transactions found</td></tr>'; return; }
+  tbody.innerHTML = txs.map(t=>{
+    const sc  = t.status==='Paid'?'badge-green':t.status==='Pending'?'badge-yellow':'badge-red';
+    const col = t.type==='Income'?'var(--accent)':'var(--danger)';
+    return `<tr>
+      <td style="color:var(--muted);font-family:var(--mono)">#${t.id}</td>
+      <td>${t.desc}</td>
+      <td><span class="badge ${t.type==='Income'?'badge-green':'badge-red'}">${t.type}</span></td>
+      <td style="color:${col};font-family:var(--mono)">${t.type==='Income'?'+':'−'}K${t.amount.toLocaleString()}</td>
+      <td style="color:var(--muted)">${t.date}</td>
+      <td><span class="badge ${sc}">${t.status}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditTx(${t.id})">✏</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTx(${t.id})" style="margin-left:4px">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function addTransaction(){
+  const desc = document.getElementById('tx-desc').value.trim();
+  if(!desc){ toast('⚠ Description required','err'); return; }
+  const txs = storeGet('transactions')||[];
+  txs.unshift({
+    id:     getNextId(),
+    desc,
+    type:   document.getElementById('tx-type').value,
+    amount: parseFloat(document.getElementById('tx-amount').value)||0,
+    date:   new Date().toISOString().slice(0,10),
+    status: document.getElementById('tx-status').value,
+  });
+  storeSet('transactions', txs);
+  closeModal('add-tx-modal');
+  renderAll();
+  toast('✓ Transaction saved');
+  logEvent('Transaction added: '+desc);
+  document.getElementById('tx-desc').value='';
+  document.getElementById('tx-amount').value='';
+}
+
+function openEditTx(id){
+  const txs= storeGet('transactions')||[];
+  const tx = txs.find(t=>t.id===id); if(!tx) return;
+  document.getElementById('edit-tx-id').value     = id;
+  document.getElementById('edit-tx-desc').value   = tx.desc;
+  document.getElementById('edit-tx-type').value   = tx.type;
+  document.getElementById('edit-tx-amount').value = tx.amount;
+  document.getElementById('edit-tx-status').value = tx.status;
+  openModal('edit-tx-modal');
+}
+
+function saveEditTx(){
+  const txs= storeGet('transactions')||[];
+  const id = parseInt(document.getElementById('edit-tx-id').value);
+  const tx = txs.find(t=>t.id===id); if(!tx) return;
+  tx.desc   = document.getElementById('edit-tx-desc').value.trim();
+  tx.type   = document.getElementById('edit-tx-type').value;
+  tx.amount = parseFloat(document.getElementById('edit-tx-amount').value)||0;
+  tx.status = document.getElementById('edit-tx-status').value;
+  storeSet('transactions', txs);
+  closeModal('edit-tx-modal');
+  renderAll();
+  toast('✓ Transaction updated');
+  logEvent('Transaction edited: '+tx.desc);
+}
+
+function deleteTx(id){
+  if(!confirm('Delete this transaction?')) return;
+  let txs = storeGet('transactions')||[];
+  const tx= txs.find(t=>t.id===id);
+  txs = txs.filter(t=>t.id!==id);
+  storeSet('transactions', txs);
+  renderAll();
+  toast('Transaction deleted');
+  if(tx) logEvent('Transaction deleted: '+tx.desc);
+}
+</script>
+</body>
+</html>

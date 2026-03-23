@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — Admin Control</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.admin-grid { display:grid; grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+.super-badge { background:linear-gradient(135deg,#ff6b35,#f7c59f); color:#000; font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:1px; padding:5px 14px; border-radius:20px; display:flex; align-items:center; gap:6px; }
+.metric-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px; border-left:3px solid var(--accent); }
+.metric-card.blue   { border-left-color:var(--accent2); }
+.metric-card.red    { border-left-color:var(--danger); }
+.metric-card.yellow { border-left-color:var(--warning); }
+.metric-val { font-family:var(--mono); font-size:28px; font-weight:700; color:var(--accent); line-height:1; margin-bottom:4px; }
+.metric-card.blue .metric-val   { color:var(--accent2); }
+.metric-card.red .metric-val    { color:var(--danger); }
+.metric-card.yellow .metric-val { color:var(--warning); }
+.metric-lbl { font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); font-family:var(--mono); margin-bottom:6px; }
+.metric-sub { font-size:12px; color:var(--muted); }
+.user-card { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; transition:border-color .15s; }
+.user-avatar-sm { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:12px; font-weight:700; color:#000; flex-shrink:0; }
+.user-info-sm { flex:1; min-width:0; }
+.user-name-sm { font-size:13px; font-weight:600; margin-bottom:2px; }
+.user-meta-sm { font-size:11px; color:var(--muted); }
+.user-actions { display:flex; gap:6px; flex-shrink:0; }
+.prod-bar-row { margin-bottom:14px; }
+.prod-bar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; }
+.prod-bar-track { height:7px; background:var(--surface2); border-radius:10px; overflow:hidden; }
+.prod-bar-fill  { height:100%; border-radius:10px; transition:width .6s ease; }
+.admin-tabs { display:flex; gap:2px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:3px; margin-bottom:18px; }
+.admin-tab { flex:1; padding:8px 12px; background:transparent; border:none; color:var(--muted); font-family:var(--mono); font-size:11px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; border-radius:6px; transition:all .15s; }
+.admin-tab.active { background:var(--surface); color:var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.3); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.log-entry { padding:9px 0; border-bottom:1px solid rgba(26,45,74,.4); font-size:12px; display:flex; gap:10px; align-items:flex-start; }
+.log-entry:last-child { border-bottom:none; }
+.log-ts  { color:var(--accent2); font-family:var(--mono); white-space:nowrap; flex-shrink:0; }
+.log-msg { color:var(--muted); }
+.role-super   { background:rgba(255,107,53,.15); color:#ff6b35; }
+.role-admin   { background:rgba(0,230,118,.12);  color:var(--accent); }
+.role-sales   { background:rgba(0,176,255,.12);  color:var(--accent2); }
+.role-tech    { background:rgba(255,170,0,.12);  color:var(--warning); }
+.role-acct    { background:rgba(200,100,255,.12);color:#c864ff; }
+.role-manager { background:rgba(255,61,87,.12);  color:var(--danger); }
+.role-viewer  { background:rgba(90,122,158,.12); color:var(--muted); }
+.access-pill { font-size:10px; font-family:var(--mono); padding:2px 8px; border-radius:20px; background:var(--surface); border:1px solid var(--border); color:var(--muted); }
+.setting-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0; border-bottom:1px solid rgba(26,45,74,.4); font-size:13px; }
+.setting-row:last-child { border-bottom:none; }
+.setting-label { font-weight:500; }
+.setting-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.toggle-switch { position:relative; width:42px; height:22px; background:var(--border); border-radius:11px; cursor:pointer; transition:background .2s; flex-shrink:0; }
+.toggle-switch.on { background:var(--accent); }
+.toggle-knob { position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .2s; }
+.toggle-switch.on .toggle-knob { left:23px; }
+.av0 { background:linear-gradient(135deg,var(--accent),#00b09b); }
+.av1 { background:linear-gradient(135deg,var(--accent2),#0072ff); }
+.av2 { background:linear-gradient(135deg,#ff6b35,#f7c59f); }
+.av3 { background:linear-gradient(135deg,#c864ff,#7b2fff); }
+.av4 { background:linear-gradient(135deg,var(--warning),#ff6b35); }
+.av5 { background:linear-gradient(135deg,var(--danger),#c864ff); }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.5px; }
+.form-group input, .form-group select { width:100%; }
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px; width:420px; max-width:95vw; }
+.modal-title { font-family:var(--mono); font-size:15px; margin-bottom:12px; }
+.modal-body { font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.6; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+</style>
+<!-- MOBILE_PATCH -->
+<style>
+@media(max-width:768px){
+  .admin-grid { grid-template-columns:1fr !important; }
+  .admin-tabs { flex-wrap:wrap; }
+  .admin-tab  { flex:1 1 40%; font-size:10px; padding:7px 6px; }
+  .super-badge { font-size:10px; padding:4px 8px; }
+  .super-badge span { display:none; } /* hide name on mobile, show role only */
+  .metric-card { padding:14px; }
+  #user-search { width:100%; margin-top:8px; }
+}
+</style>
+</head>
+<body>
+
+<div id="offline-banner">⚠ OFFLINE MODE — changes are being cached locally</div>
+
+<nav class="navbar">
+  <div class="logo">LEXMO <span>SOLAR</span> // <span style="color:#ff6b35">ADMIN</span></div>
+  <div class="nav-status">
+    <span><span class="online-dot"></span><span id="conn-status">Online</span></span>
+    <span class="super-badge">🛡 SUPER ADMIN · <span id="nav-username">—</span></span>
+    <a href="dashboard.html" class="logout-btn" style="text-decoration:none">← Dashboard</a>
+    <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">ADMIN CONTROL CENTER</div>
+      <div class="page-sub">Manage personnel, permissions, and business analytics · <span id="clock"></span></div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="grid-4" style="margin-bottom:20px">
+      <div class="metric-card">
+        <div class="metric-lbl">Total Users</div>
+        <div class="metric-val" id="m-users">—</div>
+        <div class="metric-sub">Registered accounts</div>
+      </div>
+      <div class="metric-card blue">
+        <div class="metric-lbl">Conversion Rate</div>
+        <div class="metric-val" id="m-conv">—</div>
+        <div class="metric-sub">Leads → Won deals</div>
+      </div>
+      <div class="metric-card yellow">
+        <div class="metric-lbl">Avg. Deal Value</div>
+        <div class="metric-val" id="m-avg">—</div>
+        <div class="metric-sub">Across all leads</div>
+      </div>
+      <div class="metric-card red">
+        <div class="metric-lbl">Profit Margin</div>
+        <div class="metric-val" id="m-margin">—</div>
+        <div class="metric-sub">Income vs expense</div>
+      </div>
+    </div>
+
+    <div class="admin-grid">
+      <!-- LEFT: Personnel -->
+      <section>
+        <div class="card" style="margin-bottom:18px">
+          <div class="card-title">➕ Add New Employee</div>
+          <div class="form-group"><label>Full Name</label><input type="text" id="u-name" placeholder="e.g. Wezi Kabungo"></div>
+          <div class="form-group"><label>Email / Username</label><input type="text" id="u-email" placeholder="wezi@lexmosolar.co.zm"></div>
+          <div class="form-group"><label>Password</label><input type="password" id="u-pass" placeholder="Set login password"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group"><label>Role</label>
+              <select id="u-role">
+                <option value="Sales">Sales Rep</option>
+                <option value="Technician">IT Technician</option>
+                <option value="Accountant">Accountant</option>
+                <option value="Manager">Ops Manager</option>
+                <option value="Admin">Admin</option>
+                <option value="Viewer">Viewer</option>
+              </select>
+            </div>
+            <div class="form-group"><label>System Access</label>
+              <select id="u-access">
+                <option value="View-Only">View-Only</option>
+                <option value="Editor">Editor</option>
+                <option value="Admin">Full Admin</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="addEmployee()">REGISTER EMPLOYEE</button>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="card-title" style="margin:0">👥 Personnel (<span id="user-count">0</span>)</div>
+            <input type="text" id="user-search" placeholder="Search…" oninput="renderUsers()" style="width:120px;font-size:12px;padding:6px 10px">
+          </div>
+          <div id="user-list"><p style="color:var(--muted);font-size:13px">No employees yet.</p></div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Analytics tabs -->
+      <section>
+        <div class="admin-tabs">
+          <button class="admin-tab active" onclick="switchAdminTab('analytics')">📊 Analytics</button>
+          <button class="admin-tab" onclick="switchAdminTab('performance')">🏆 Performance</button>
+          <button class="admin-tab" onclick="switchAdminTab('activity')">📋 Activity</button>
+          <button class="admin-tab" onclick="switchAdminTab('settings')">⚙ Settings</button>
+        </div>
+
+        <!-- ANALYTICS -->
+        <div id="tab-analytics" class="tab-content active">
+          <div class="card" style="margin-bottom:18px">
+            <div class="card-title">Business Health Analysis</div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Metric</th><th>Value</th><th>Benchmark</th><th>Status</th></tr></thead>
+              <tbody id="analysis-tbody"></tbody></table>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:18px">
+            <div class="card-title">Pipeline by Stage</div>
+            <div id="pipeline-breakdown"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Cash Flow Summary</div>
+            <div id="cashflow-summary"></div>
+          </div>
+        </div>
+
+        <!-- PERFORMANCE -->
+        <div id="tab-performance" class="tab-content">
+          <div class="card" style="margin-bottom:18px">
+            <div class="card-title">Sales by Product Interest</div>
+            <div id="product-performance"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Inventory Value & Stock Levels</div>
+            <div id="inventory-turnover"></div>
+          </div>
+        </div>
+
+        <!-- ACTIVITY LOG -->
+        <div id="tab-activity" class="tab-content">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+              <div class="card-title" style="margin:0">System Activity Log</div>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="log-filter" placeholder="Filter…" oninput="renderLog()" style="font-size:12px;padding:6px 10px;width:140px">
+                <button class="btn btn-outline btn-sm" onclick="clearActivityLog()">Clear</button>
+              </div>
+            </div>
+            <div id="activity-log" style="max-height:420px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div id="tab-settings" class="tab-content">
+          <div class="card" style="margin-bottom:18px">
+            <div class="card-title">⚙ System Settings</div>
+            <div class="setting-row">
+              <div><div class="setting-label">Offline Mode / Background Sync</div><div class="setting-sub">Cache data locally when network is unavailable</div></div>
+              <div class="toggle-switch on" id="tog-offline" onclick="toggleSetting('offline',this)"><div class="toggle-knob"></div></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-label">Duplicate Invoice Detection</div><div class="setting-sub">Alert on duplicate transaction descriptions</div></div>
+              <div class="toggle-switch on" id="tog-dup" onclick="toggleSetting('dup',this)"><div class="toggle-knob"></div></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-label">Low Stock Alerts</div><div class="setting-sub">Notify dashboard when stock drops below minimum</div></div>
+              <div class="toggle-switch on" id="tog-stock" onclick="toggleSetting('stock',this)"><div class="toggle-knob"></div></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-label">Activity Logging</div><div class="setting-sub">Record all user actions in the event log</div></div>
+              <div class="toggle-switch on" id="tog-log" onclick="toggleSetting('log',this)"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:18px">
+            <div class="card-title">🗄 Data Management</div>
+            <div class="setting-row">
+              <div><div class="setting-label">Export All Data</div><div class="setting-sub">Download everything as JSON</div></div>
+              <button class="btn btn-outline btn-sm" onclick="exportData()">Export JSON</button>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-label">Reset to Defaults</div><div class="setting-sub">Wipe all data and restore seed defaults</div></div>
+              <button class="btn btn-danger btn-sm" onclick="openModal('confirm-reset-modal')">Reset Data</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">🔑 Change Admin Password</div>
+            <div class="form-group"><label>Current Password</label><input type="password" id="pw-current" placeholder="Current password"></div>
+            <div class="form-group"><label>New Password</label><input type="password" id="pw-new" placeholder="New password (6+ chars)"></div>
+            <div class="form-group"><label>Confirm New</label><input type="password" id="pw-confirm" placeholder="Repeat new password"></div>
+            <div id="pw-msg" style="font-size:12px;font-family:var(--mono);margin-bottom:10px;display:none"></div>
+            <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Confirm Reset Modal -->
+<div class="modal-overlay" id="confirm-reset-modal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--danger)">⚠ Reset All Data?</div>
+    <div class="modal-body">This will permanently wipe all inventory, leads, transactions, and employee records (Super Admin protected). Seed defaults will be restored. This cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('confirm-reset-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="resetAllData()">Yes, Reset Everything</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="edit-user-modal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--accent)">✏ Edit Employee</div>
+    <input type="hidden" id="edit-uid">
+    <div class="form-group"><label>Full Name</label><input type="text" id="edit-uname"></div>
+    <div class="form-group"><label>Email</label><input type="text" id="edit-uemail"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>Role</label>
+        <select id="edit-urole">
+          <option value="Sales">Sales Rep</option><option value="Technician">IT Technician</option>
+          <option value="Accountant">Accountant</option><option value="Manager">Ops Manager</option>
+          <option value="Admin">Admin</option><option value="Viewer">Viewer</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Access</label>
+        <select id="edit-uaccess">
+          <option value="View-Only">View-Only</option>
+          <option value="Editor">Editor</option>
+          <option value="Admin">Full Admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>New Password (blank = keep current)</label><input type="password" id="edit-upass" placeholder="(unchanged)"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('edit-user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditUser()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="store.js"></script>
+<script src="shell.js"></script>
+<script>
+var AV_CLASSES = ['av0','av1','av2','av3','av4','av5'];
+var ROLE_BADGE_MAP = { SuperAdmin:'role-super', Admin:'role-admin', Sales:'role-sales', Technician:'role-tech', Accountant:'role-acct', Manager:'role-manager', Viewer:'role-viewer' };
+
+document.addEventListener('DOMContentLoaded', function() {
+  var s = getSession();
+  if (!s || s.role !== 'SuperAdmin') { window.location.href = 'dashboard.html'; return; }
+  document.getElementById('nav-username').textContent = s.first + ' ' + s.last;
+  initNavbar();
+  renderShell('admin_control');
+  loadSettings();
+  refreshAll();
+});
+
+function onStoreUpdate() { refreshAll(); }
+
+function refreshAll() {
+  renderKPIs(); renderUsers(); renderAnalytics(); renderPerformance(); renderLog();
+}
+
+function renderKPIs() {
+  var users = getUsers();
+  var leads = storeGet('leads') || [];
+  var txs   = storeGet('transactions') || [];
+  var won   = leads.filter(function(l){ return l.stage==='Won'; });
+  var conv  = leads.length ? Math.round(won.length/leads.length*100) : 0;
+  var totalV= leads.reduce(function(a,l){ return a+l.value; },0);
+  var avgV  = leads.length ? Math.round(totalV/leads.length) : 0;
+  var inc   = txs.filter(function(t){ return t.type==='Income'; }).reduce(function(a,t){ return a+t.amount; },0);
+  var exp   = txs.filter(function(t){ return t.type==='Expense'; }).reduce(function(a,t){ return a+t.amount; },0);
+  var marg  = inc>0 ? Math.round((inc-exp)/inc*100) : 0;
+  document.getElementById('m-users').textContent  = users.length;
+  document.getElementById('m-conv').textContent   = conv+'%';
+  document.getElementById('m-avg').textContent    = 'K'+avgV.toLocaleString();
+  document.getElementById('m-margin').textContent = marg+'%';
+  document.getElementById('user-count').textContent = users.length;
+}
+
+function renderUsers() {
+  var users = getUsers();
+  var q     = (document.getElementById('user-search').value||'').toLowerCase();
+  var filtered = q ? users.filter(function(u){
+    var n = (u.first||u.name||''); return n.toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)||(u.role||'').toLowerCase().includes(q);
+  }) : users;
+  var list = document.getElementById('user-list');
+  if (!filtered.length) { list.innerHTML='<p style="color:var(--muted);font-size:13px">No employees found.</p>'; return; }
+  list.innerHTML = filtered.map(function(u, i){
+    var name = u.first ? u.first+' '+u.last : (u.name||'Unknown');
+    var ini  = name.split(' ').map(function(n){ return n.charAt(0); }).join('').toUpperCase().slice(0,2);
+    var av   = AV_CLASSES[i % AV_CLASSES.length];
+    var rb   = ROLE_BADGE_MAP[u.role] || 'role-viewer';
+    var isS  = u.role === 'SuperAdmin';
+    return '<div class="user-card">' +
+      '<div class="user-avatar-sm '+av+'">'+ini+'</div>' +
+      '<div class="user-info-sm">' +
+        '<div class="user-name-sm">'+name+(isS?' <span style="font-size:10px;color:#ff6b35">★</span>':'')+'</div>' +
+        '<div class="user-meta-sm"><span class="badge '+rb+'" style="font-size:10px;padding:2px 7px;margin-right:5px">'+(u.role||'—')+'</span>' +
+        '<span class="access-pill">'+(u.access||(isS?'Super Admin':'Full Access'))+'</span></div>' +
+      '</div>' +
+      '<div class="user-actions">' +
+        (!isS
+          ? '<button class="btn btn-outline btn-sm" onclick="openEditUser(\''+u.id+'\')">✏</button>' +
+            '<button class="btn btn-danger btn-sm" onclick="confirmDeleteUser(\''+u.id+'\')">🗑</button>'
+          : '<span style="font-size:11px;color:var(--muted)">Protected</span>') +
+      '</div></div>';
+  }).join('');
+}
+
+function addEmployee() {
+  var name   = document.getElementById('u-name').value.trim();
+  var email  = document.getElementById('u-email').value.trim();
+  var pass   = document.getElementById('u-pass').value;
+  var role   = document.getElementById('u-role').value;
+  var access = document.getElementById('u-access').value;
+  if (!name)  { toast('⚠ Full name required','err'); return; }
+  if (!email) { toast('⚠ Email required','err'); return; }
+  if (!pass)  { toast('⚠ Password required','err'); return; }
+  var users = getUsers();
+  for (var i=0;i<users.length;i++) { if((users[i].email||'').toLowerCase()===email.toLowerCase()){ toast('⚠ Email already registered','err'); return; } }
+  var parts = name.split(' ');
+  users.push({ id:'emp_'+Date.now(), first:parts[0], last:parts.slice(1).join(' ')||'—', name:name, email:email, password:pass, role:role, access:access, phone:'', created:new Date().toISOString() });
+  saveUsers(users);
+  document.getElementById('u-name').value=''; document.getElementById('u-email').value=''; document.getElementById('u-pass').value='';
+  refreshAll(); toast('✓ Employee registered: '+name); logEvent('Admin added employee: '+name+' ('+role+')');
+}
+
+function openEditUser(id) {
+  var u = getUsers().find(function(x){ return String(x.id)===String(id); }); if(!u) return;
+  document.getElementById('edit-uid').value    = id;
+  document.getElementById('edit-uname').value  = u.first ? u.first+' '+u.last : (u.name||'');
+  document.getElementById('edit-uemail').value = u.email||'';
+  document.getElementById('edit-urole').value  = u.role||'Viewer';
+  document.getElementById('edit-uaccess').value= u.access||'View-Only';
+  document.getElementById('edit-upass').value  = '';
+  openModal('edit-user-modal');
+}
+
+function saveEditUser() {
+  var id=document.getElementById('edit-uid').value;
+  var users=getUsers(); var u=users.find(function(x){ return String(x.id)===String(id); }); if(!u) return;
+  var name=document.getElementById('edit-uname').value.trim(); var parts=name.split(' ');
+  u.first=parts[0]; u.last=parts.slice(1).join(' ')||'—'; u.name=name;
+  u.email=document.getElementById('edit-uemail').value.trim();
+  u.role=document.getElementById('edit-urole').value;
+  u.access=document.getElementById('edit-uaccess').value;
+  var np=document.getElementById('edit-upass').value; if(np) u.password=np;
+  saveUsers(users); closeModal('edit-user-modal'); refreshAll(); toast('✓ Employee updated'); logEvent('Admin updated: '+name);
+}
+
+function confirmDeleteUser(id) { if(confirm('Remove this employee?')) deleteUser(id); }
+function deleteUser(id) {
+  var users=getUsers().filter(function(u){ return String(u.id)!==String(id); });
+  saveUsers(users); refreshAll(); toast('Employee removed'); logEvent('Admin removed employee (id:'+id+')');
+}
+
+function renderAnalytics() {
+  var leads=storeGet('leads')||[]; var txs=storeGet('transactions')||[]; var inv=storeGet('inventory')||[];
+  var inc=txs.filter(function(t){ return t.type==='Income'; }).reduce(function(a,t){ return a+t.amount; },0);
+  var exp=txs.filter(function(t){ return t.type==='Expense'; }).reduce(function(a,t){ return a+t.amount; },0);
+  var net=inc-exp; var margin=inc>0?Math.round(net/inc*100):0;
+  var won=leads.filter(function(l){ return l.stage==='Won'; });
+  var totalP=leads.reduce(function(a,l){ return a+l.value; },0);
+  var lowS=inv.filter(function(i){ return i.qty<=i.min; }).length;
+  var overdue=txs.filter(function(t){ return t.status==='Overdue'; }).length;
+  var rows=[
+    { m:'Net Cash Flow',     v:'K'+net.toLocaleString(),              b:'> K0',    ok:net>=0 },
+    { m:'Profit Margin',     v:margin+'%',                            b:'> 20%',   ok:margin>=20 },
+    { m:'Pipeline Value',    v:'K'+totalP.toLocaleString(),           b:'Growing', ok:totalP>0 },
+    { m:'Won Deals',         v:won.length+' / '+leads.length,        b:'> 30% CR',ok:leads.length>0&&won.length/leads.length>=0.3 },
+    { m:'Overdue Invoices',  v:overdue,                               b:'= 0',     ok:overdue===0 },
+    { m:'Low Stock Items',   v:lowS,                                  b:'= 0',     ok:lowS===0 },
+  ];
+  document.getElementById('analysis-tbody').innerHTML=rows.map(function(r){
+    return '<tr><td>'+r.m+'</td><td style="font-family:var(--mono)">'+r.v+'</td><td style="color:var(--muted)">'+r.b+'</td><td><span class="badge '+(r.ok?'badge-green':'badge-red')+'">'+(r.ok?'Good':'Needs Attention')+'</span></td></tr>';
+  }).join('');
+  var stages=['Prospect','Quoted','Negotiating','Won','Lost'];
+  var scols={Prospect:'var(--accent2)',Quoted:'var(--warning)',Negotiating:'var(--warning)',Won:'var(--accent)',Lost:'var(--danger)'};
+  var maxC=Math.max.apply(null,stages.map(function(s){ return leads.filter(function(l){ return l.stage===s; }).length; }))||1;
+  document.getElementById('pipeline-breakdown').innerHTML=stages.map(function(s){
+    var c=leads.filter(function(l){ return l.stage===s; }).length;
+    var v=leads.filter(function(l){ return l.stage===s; }).reduce(function(a,l){ return a+l.value; },0);
+    return '<div class="prod-bar-row"><div class="prod-bar-label"><span>'+s+'</span><span style="color:'+scols[s]+';font-family:var(--mono)">'+c+' leads · K'+v.toLocaleString()+'</span></div><div class="prod-bar-track"><div class="prod-bar-fill" style="background:'+scols[s]+';width:'+Math.round(c/maxC*100)+'%"></div></div></div>';
+  }).join('');
+  document.getElementById('cashflow-summary').innerHTML=
+    '<div style="display:flex;justify-content:space-around;margin-bottom:14px;text-align:center">'+
+    '<div><div style="font-size:11px;color:var(--muted)">INCOME</div><div style="font-family:var(--mono);color:var(--accent);font-size:20px">K'+inc.toLocaleString()+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--muted)">EXPENSE</div><div style="font-family:var(--mono);color:var(--danger);font-size:20px">K'+exp.toLocaleString()+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--muted)">NET</div><div style="font-family:var(--mono);color:'+(net>=0?'var(--accent)':'var(--danger)')+';font-size:20px">K'+Math.abs(net).toLocaleString()+'</div></div>'+
+    '</div>'+
+    '<div class="prod-bar-row"><div class="prod-bar-label"><span>Income share</span><span style="color:var(--accent)">'+(inc/(inc+exp||1)*100).toFixed(1)+'%</span></div>'+
+    '<div class="prod-bar-track" style="height:10px"><div class="prod-bar-fill" style="background:var(--accent);width:'+(inc/(inc+exp||1)*100)+'%"></div></div></div>';
+}
+
+function renderPerformance() {
+  var leads=storeGet('leads')||[]; var inv=storeGet('inventory')||[];
+  var pm={}; leads.forEach(function(l){ var p=l.product||'Other'; if(!pm[p])pm[p]={count:0,value:0}; pm[p].count++;pm[p].value+=l.value; });
+  var prods=Object.keys(pm).sort(function(a,b){ return pm[b].value-pm[a].value; });
+  var maxV=prods.length?pm[prods[0]].value:1;
+  var cols=['var(--accent)','var(--accent2)','var(--warning)','var(--danger)','#c864ff'];
+  document.getElementById('product-performance').innerHTML=prods.length
+    ?prods.map(function(p,i){ return '<div class="prod-bar-row"><div class="prod-bar-label"><span>'+p+'</span><span style="color:'+cols[i%cols.length]+';font-family:var(--mono)">'+pm[p].count+' leads · K'+pm[p].value.toLocaleString()+'</span></div><div class="prod-bar-track"><div class="prod-bar-fill" style="background:'+cols[i%cols.length]+';width:'+Math.round(pm[p].value/maxV*100)+'%"></div></div></div>'; }).join('')
+    :'<p style="color:var(--muted);font-size:13px">No lead data yet.</p>';
+  var tv=inv.reduce(function(a,i){ return a+i.price*i.qty; },0);
+  document.getElementById('inventory-turnover').innerHTML=inv.map(function(item,i){
+    var pct=Math.min(100,Math.round(item.qty/(item.min*4||20)*100));
+    var col=item.qty===0?'var(--danger)':item.qty<=item.min?'var(--warning)':'var(--accent)';
+    return '<div class="prod-bar-row"><div class="prod-bar-label"><span>'+item.name+'</span><span style="color:var(--muted);font-family:var(--mono)">'+item.qty+' units · K'+(item.price*item.qty).toLocaleString()+'</span></div><div class="prod-bar-track"><div class="prod-bar-fill" style="background:'+col+';width:'+pct+'%"></div></div></div>';
+  }).join('')+'<div style="font-size:11px;color:var(--muted);margin-top:10px;font-family:var(--mono)">Total stock value: K'+tv.toLocaleString()+'</div>';
+}
+
+function renderLog() {
+  var log=storeGet('eventLog')||[];
+  var q=(document.getElementById('log-filter')?document.getElementById('log-filter').value:'').toLowerCase();
+  var filtered=q?log.filter(function(e){ return e.toLowerCase().includes(q); }):log;
+  var el=document.getElementById('activity-log');
+  if(!filtered.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px">No log entries.</p>'; return; }
+  el.innerHTML=filtered.map(function(e){ var ts=e.split(']')[0]+']'; var msg=e.split(']').slice(1).join(']'); return '<div class="log-entry"><span class="log-ts">'+ts+'</span><span class="log-msg">'+msg+'</span></div>'; }).join('');
+}
+
+function clearActivityLog() {
+  if(!confirm('Clear the entire activity log?')) return;
+  storeSet('eventLog',[]); logEvent('Activity log cleared by Super Admin'); renderLog(); toast('Log cleared');
+}
+
+function switchAdminTab(tab) {
+  ['analytics','performance','activity','settings'].forEach(function(t){ document.getElementById('tab-'+t).classList.toggle('active',t===tab); });
+  document.querySelectorAll('.admin-tab').forEach(function(btn,i){ btn.classList.toggle('active',['analytics','performance','activity','settings'][i]===tab); });
+  if(tab==='activity') renderLog();
+}
+
+var settings={offline:true,dup:true,stock:true,log:true};
+function loadSettings(){ try{ var s=JSON.parse(localStorage.getItem('lx_admin_settings')); if(s) settings=s; }catch(e){} Object.keys(settings).forEach(function(k){ var el=document.getElementById('tog-'+k); if(el) el.classList.toggle('on',settings[k]); }); }
+function toggleSetting(key,el){ settings[key]=!settings[key]; el.classList.toggle('on',settings[key]); localStorage.setItem('lx_admin_settings',JSON.stringify(settings)); toast((settings[key]?'✓ Enabled: ':'✕ Disabled: ')+key); }
+
+function changePassword() {
+  var cur=document.getElementById('pw-current').value; var nw=document.getElementById('pw-new').value; var conf=document.getElementById('pw-confirm').value;
+  var msg=document.getElementById('pw-msg'); var session=getSession();
+  function pwMsg(text,ok){ msg.style.display='block'; msg.style.color=ok?'var(--accent)':'var(--danger)'; msg.textContent=text; }
+  if(cur!==session.password){ pwMsg('✕ Current password is incorrect.',false); return; }
+  if(nw.length<6){ pwMsg('⚠ New password must be 6+ characters.',false); return; }
+  if(nw!==conf){ pwMsg('⚠ Passwords do not match.',false); return; }
+  var users=getUsers(); var u=users.find(function(x){ return x.id===session.id; }); if(u){ u.password=nw; saveUsers(users); }
+  session.password=nw; saveSession(session);
+  pwMsg('✓ Password updated successfully.',true);
+  ['pw-current','pw-new','pw-confirm'].forEach(function(id){ document.getElementById(id).value=''; });
+  logEvent('Super Admin changed password'); toast('✓ Password updated');
+}
+
+function exportData() {
+  var data={ exportedAt:new Date().toISOString(), users:getUsers(), inventory:storeGet('inventory'), leads:storeGet('leads'), transactions:storeGet('transactions'), eventLog:storeGet('eventLog') };
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='lexmo-data-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ Data exported'); logEvent('Super Admin exported all data');
+}
+
+function resetAllData() {
+  closeModal('confirm-reset-modal');
+  ['lx_inventory','lx_leads','lx_transactions','lx_eventLog','lx_nextId'].forEach(function(k){ localStorage.removeItem(k); });
+  var admins=getUsers().filter(function(u){ return u.role==='SuperAdmin'; }); saveUsers(admins);
+  logEvent('Super Admin reset all data'); toast('✓ Data reset — defaults restored');
+  setTimeout(function(){ refreshAll(); },300);
+}
+
+function openModal(id){ var el=document.getElementById(id); if(el) el.classList.add('open'); }
+function closeModal(id){ var el=document.getElementById(id); if(el) el.classList.remove('open'); }
+document.addEventListener('DOMContentLoaded',function(){ document.querySelectorAll('.modal-overlay').forEach(function(m){ m.addEventListener('click',function(e){ if(e.target===m) m.classList.remove('open'); }); }); });
+</script>
+</body>
+</html>

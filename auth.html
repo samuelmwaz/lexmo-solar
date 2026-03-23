@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — Sign In</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+body { overflow: hidden; }
+#bg-canvas { position:fixed; inset:0; z-index:0; opacity:.35; pointer-events:none; }
+.auth-wrap  { display:flex; min-height:100vh; position:relative; z-index:1; }
+
+.auth-left {
+  width:55%; display:flex; flex-direction:column; justify-content:center;
+  padding:60px; position:relative; overflow:hidden;
+}
+.auth-left::after {
+  content:''; position:absolute; right:0; top:0; bottom:0; width:1px;
+  background:linear-gradient(to bottom,transparent,var(--border) 30%,var(--accent) 50%,var(--border) 70%,transparent);
+}
+.orb {
+  position:absolute; bottom:-80px; left:60px; width:260px; height:260px; border-radius:50%;
+  background:radial-gradient(circle,rgba(0,230,118,.15) 0%,rgba(0,176,255,.05) 50%,transparent 70%);
+  filter:blur(20px); pointer-events:none;
+}
+.brand-tag {
+  font-family:var(--mono); font-size:11px; letter-spacing:4px; text-transform:uppercase;
+  color:var(--accent); margin-bottom:48px; display:flex; align-items:center; gap:10px;
+}
+.brand-dot {
+  width:6px; height:6px; background:var(--accent); border-radius:50%;
+  box-shadow:0 0 10px var(--accent); animation:pulse 2s infinite;
+}
+.hero-h1 { font-family:var(--mono); font-size:clamp(30px,4vw,52px); line-height:1.1; font-weight:700; margin-bottom:18px; }
+.hero-h1 .green { color:var(--accent); }
+.hero-p  { font-size:14px; color:var(--muted); max-width:380px; line-height:1.7; margin-bottom:40px; }
+.features { display:flex; flex-direction:column; gap:14px; }
+.feat-row { display:flex; align-items:center; gap:12px; font-size:13px; color:var(--muted); }
+.feat-ico {
+  width:32px; height:32px; background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.2);
+  border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0;
+}
+
+.auth-right { width:45%; display:flex; align-items:center; justify-content:center; padding:40px 48px; }
+.auth-box   { width:100%; max-width:400px; }
+
+.auth-tabs {
+  display:flex; background:var(--surface2); border:1px solid var(--border);
+  border-radius:10px; padding:4px; margin-bottom:26px;
+}
+.tab-btn {
+  flex:1; padding:10px; background:transparent; border:none; border-radius:7px;
+  color:var(--muted); font-family:var(--mono); font-size:12px; letter-spacing:1px;
+  cursor:pointer; transition:all .2s; text-transform:uppercase;
+}
+.tab-btn.active {
+  background:var(--surface); color:var(--accent);
+  border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+
+.auth-h2  { font-family:var(--mono); font-size:18px; margin-bottom:4px; }
+.auth-sub { font-size:12px; color:var(--muted); margin-bottom:22px; }
+.fgroup   { margin-bottom:14px; }
+.fgroup label {
+  display:block; font-size:11px; letter-spacing:.8px; text-transform:uppercase;
+  color:var(--muted); margin-bottom:6px; font-family:var(--mono);
+}
+.inp-wrap { position:relative; }
+.inp-wrap .ico {
+  position:absolute; left:13px; top:50%; transform:translateY(-50%);
+  font-size:14px; pointer-events:none; opacity:.5;
+}
+.inp-wrap input {
+  width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+  padding:11px 14px 11px 38px; color:var(--text); font-family:var(--sans);
+  font-size:13px; outline:none; transition:border-color .2s, box-shadow .2s;
+}
+.inp-wrap input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,230,118,.08); }
+.inp-wrap input::placeholder { color:var(--muted); opacity:.6; }
+.eye-btn {
+  position:absolute; right:12px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0;
+}
+.eye-btn:hover { color:var(--text); }
+
+.str-bars { display:flex; gap:4px; margin:6px 0 3px; }
+.str-bar  { flex:1; height:3px; border-radius:10px; background:var(--surface2); transition:background .3s; }
+.str-lbl  { font-size:10px; color:var(--muted); font-family:var(--mono); }
+
+.role-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.role-card {
+  background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; cursor:pointer; transition:all .2s;
+  display:flex; align-items:center; gap:8px; font-size:12px;
+}
+.role-card:hover   { border-color:var(--accent); }
+.role-card.selected{ border-color:var(--accent); background:rgba(0,230,118,.06); color:var(--accent); }
+.role-card input[type=radio]{ display:none; }
+
+.check-row { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); cursor:pointer; margin-bottom:4px; }
+.check-row input[type=checkbox]{ width:15px; height:15px; accent-color:var(--accent); }
+.check-row a { color:var(--accent); text-decoration:none; }
+
+.msg { padding:10px 14px; border-radius:7px; font-size:12px; font-family:var(--mono); margin-bottom:14px; display:none; }
+.msg.show{ display:block; }
+.msg-err { background:rgba(255,61,87,.1); border:1px solid rgba(255,61,87,.3); color:var(--danger); }
+.msg-ok  { background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.3); color:var(--accent); }
+
+.btn-submit {
+  width:100%; padding:13px; background:var(--accent); color:#000; border:none;
+  border-radius:8px; font-family:var(--mono); font-size:13px; font-weight:700;
+  letter-spacing:1px; cursor:pointer; margin-top:16px; transition:all .2s; text-transform:uppercase;
+}
+.btn-submit:hover { box-shadow:0 4px 20px rgba(0,230,118,.35); opacity:.9; }
+.btn-submit:disabled { opacity:.5; cursor:not-allowed; }
+.auth-note { text-align:center; font-size:11px; color:var(--muted); margin-top:14px; }
+.auth-note a { color:var(--accent); text-decoration:none; cursor:pointer; }
+
+.user-pill {
+  display:flex; align-items:center; gap:14px; background:var(--surface2);
+  border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+  cursor:pointer; transition:all .2s; margin-bottom:10px;
+}
+.user-pill:hover { border-color:var(--accent); background:rgba(0,230,118,.05); }
+.u-avatar {
+  width:38px; height:38px; border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:13px; font-weight:700; color:#000; flex-shrink:0;
+}
+.u-name { font-size:14px; font-weight:600; margin-bottom:2px; }
+.u-role { font-size:11px; color:var(--muted); font-family:var(--mono); }
+.btn-ghost {
+  width:100%; padding:11px; background:transparent; border:1px solid var(--border);
+  color:var(--muted); border-radius:8px; font-family:var(--mono); font-size:12px;
+  cursor:pointer; margin-top:6px; transition:all .2s;
+}
+.btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+
+.spin {
+  width:14px; height:14px; border:2px solid rgba(0,0,0,.25); border-top-color:#000;
+  border-radius:50%; animation:spin .6s linear infinite;
+  display:inline-block; vertical-align:middle; margin-right:6px;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+@media(max-width:768px){ .auth-left{ display:none; } .auth-right{ width:100%; padding:24px; } }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+
+<div class="auth-wrap">
+  <!-- Left hero -->
+  <div class="auth-left">
+    <div class="orb"></div>
+    <div class="brand-tag"><div class="brand-dot"></div>Lexmo Solar Systems</div>
+    <h1 class="hero-h1">Power Your<br><span class="green">Operations.</span></h1>
+    <p class="hero-p">The Command Center for solar energy businesses in Zambia. Manage inventory, leads, quotes, and financials — all in one place.</p>
+    <div class="features">
+      <div class="feat-row"><div class="feat-ico">⚡</div><span>Live inventory tracking with low-stock alerts</span></div>
+      <div class="feat-row"><div class="feat-ico">👥</div><span>CRM pipeline from prospect to close</span></div>
+      <div class="feat-row"><div class="feat-ico">📄</div><span>Instant PDF quote generation for clients</span></div>
+      <div class="feat-row"><div class="feat-ico">🌐</div><span>Offline-ready — built for Zambia connectivity</span></div>
+    </div>
+  </div>
+
+  <!-- Right form -->
+  <div class="auth-right">
+    <div class="auth-box">
+
+      <div class="auth-tabs">
+        <button class="tab-btn active" id="tab-login"    onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn"        id="tab-register" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <!-- ── LOGIN ── -->
+      <div id="pane-login">
+        <div class="auth-h2">Welcome back</div>
+        <div class="auth-sub">Sign in to your Command Center</div>
+        <div id="l-err" class="msg msg-err"></div>
+        <div id="l-ok"  class="msg msg-ok"></div>
+        <div class="fgroup">
+          <label>Email Address</label>
+          <div class="inp-wrap">
+            <span class="ico">✉</span>
+            <input type="text" id="l-email" placeholder="admin@lexmosolar.co.zm" autocomplete="email">
+          </div>
+        </div>
+        <div class="fgroup">
+          <label>Password</label>
+          <div class="inp-wrap">
+            <span class="ico">🔒</span>
+            <input type="password" id="l-pass" placeholder="Your password"
+              onkeydown="if(event.key==='Enter') doLogin()">
+            <button class="eye-btn" type="button" onclick="togglePwd('l-pass',this)">👁</button>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <label class="check-row"><input type="checkbox" id="remember-me"> Remember me</label>
+          <a style="font-size:12px;color:var(--accent);cursor:pointer" onclick="forgotPass()">Forgot password?</a>
+        </div>
+        <button class="btn-submit" id="login-btn" onclick="doLogin()">Sign In</button>
+        <div class="auth-note">No account? <a onclick="switchTab('register')">Create one free</a></div>
+      </div>
+
+      <!-- ── REGISTER ── -->
+      <div id="pane-register" style="display:none">
+        <div class="auth-h2">Create Account</div>
+        <div class="auth-sub">Join Lexmo Solar Command Center</div>
+        <div id="r-err" class="msg msg-err"></div>
+        <div id="r-ok"  class="msg msg-ok"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="fgroup">
+            <label>First Name</label>
+            <div class="inp-wrap"><span class="ico">👤</span><input type="text" id="r-first" placeholder="Samuel"></div>
+          </div>
+          <div class="fgroup">
+            <label>Last Name</label>
+            <div class="inp-wrap"><span class="ico">👤</span><input type="text" id="r-last" placeholder="Mwale"></div>
+          </div>
+        </div>
+        <div class="fgroup">
+          <label>Email</label>
+          <div class="inp-wrap"><span class="ico">✉</span><input type="text" id="r-email" placeholder="you@lexmosolar.co.zm"></div>
+        </div>
+        <div class="fgroup">
+          <label>Phone</label>
+          <div class="inp-wrap"><span class="ico">📞</span><input type="text" id="r-phone" placeholder="+260 9XX XXX XXX"></div>
+        </div>
+        <div class="fgroup" style="margin-bottom:14px">
+          <label>Role</label>
+          <div class="role-grid">
+            <label class="role-card selected" onclick="pickRole(this)"><input type="radio" name="role" value="Admin" checked><span>🛡</span>Admin</label>
+            <label class="role-card" onclick="pickRole(this)"><input type="radio" name="role" value="Sales"><span>💼</span>Sales</label>
+            <label class="role-card" onclick="pickRole(this)"><input type="radio" name="role" value="Technician"><span>🔧</span>Technician</label>
+            <label class="role-card" onclick="pickRole(this)"><input type="radio" name="role" value="Viewer"><span>👁</span>Viewer</label>
+          </div>
+        </div>
+        <div class="fgroup">
+          <label>Password</label>
+          <div class="inp-wrap">
+            <span class="ico">🔒</span>
+            <input type="password" id="r-pass" placeholder="Create a strong password" oninput="checkStr(this.value)">
+            <button class="eye-btn" type="button" onclick="togglePwd('r-pass',this)">👁</button>
+          </div>
+          <div class="str-bars">
+            <div class="str-bar" id="sb1"></div><div class="str-bar" id="sb2"></div>
+            <div class="str-bar" id="sb3"></div><div class="str-bar" id="sb4"></div>
+          </div>
+          <div class="str-lbl" id="slbl">Enter a password</div>
+        </div>
+        <div class="fgroup">
+          <label>Confirm Password</label>
+          <div class="inp-wrap">
+            <span class="ico">🔒</span>
+            <input type="password" id="r-conf" placeholder="Repeat password">
+            <button class="eye-btn" type="button" onclick="togglePwd('r-conf',this)">👁</button>
+          </div>
+        </div>
+        <label class="check-row"><input type="checkbox" id="r-terms"> I agree to the <a href="#">Terms of Service</a></label>
+        <button class="btn-submit" id="reg-btn" onclick="doRegister()">Create Account</button>
+        <div class="auth-note">Already have an account? <a onclick="switchTab('login')">Sign in</a></div>
+      </div>
+
+      <!-- ── USER SELECT ── -->
+      <div id="pane-users" style="display:none">
+        <div class="auth-h2">Choose Account</div>
+        <div class="auth-sub">Select a profile to continue</div>
+        <div id="user-pills"></div>
+        <button class="btn-ghost" onclick="switchTab('login')">+ Sign in with another account</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- store.js must load first so KEYS is available -->
+<script src="store.js"></script>
+<script>
+// ── Canvas background ──────────────────────────────
+(function() {
+  var c = document.getElementById('bg-canvas');
+  var ctx = c.getContext('2d');
+  var W, H, pts = [];
+  function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+  for (var i = 0; i < 55; i++) {
+    pts.push({ x: Math.random()*1400, y: Math.random()*900,
+      vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3,
+      r:Math.random()*1.5+.5, a:Math.random()*.5+.2,
+      col:Math.random()>.6?'0,230,118':'0,176,255' });
+  }
+  function loop() {
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(26,45,74,.5)'; ctx.lineWidth=.5;
+    for(var x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(var y=0;y<H;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    pts.forEach(function(p){
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle='rgba('+p.col+','+p.a+')'; ctx.fill();
+    });
+    for(var i=0;i<pts.length;i++){
+      for(var j=i+1;j<pts.length;j++){
+        var dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y, d=Math.sqrt(dx*dx+dy*dy);
+        if(d<100){
+          ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y);
+          ctx.strokeStyle='rgba(0,230,118,'+(0.08*(1-d/100))+')'; ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── Boot: check if already logged in ──────────────
+(function boot() {
+  var s = getSession();
+  if (s) {
+    // Already logged in — show account picker
+    showUserSelect();
+  }
+  // else show login form (already visible by default)
+})();
+
+// ── Tab switching ──────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('pane-login').style.display    = (tab === 'login')    ? 'block' : 'none';
+  document.getElementById('pane-register').style.display = (tab === 'register') ? 'block' : 'none';
+  document.getElementById('pane-users').style.display    = (tab === 'users')    ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  clearMsgs();
+}
+
+function clearMsgs() {
+  ['l-err','l-ok','r-err','r-ok'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('show'); el.textContent = ''; }
+  });
+}
+function showMsg(id, msg) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+// ── Login ──────────────────────────────────────────
+function doLogin() {
+  clearMsgs();
+  var email = document.getElementById('l-email').value.trim();
+  var pass  = document.getElementById('l-pass').value;
+
+  if (!email || !pass) { showMsg('l-err', '⚠ Please fill in all fields.'); return; }
+
+  var users = getUsers();
+  var user  = null;
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email.toLowerCase() === email.toLowerCase() && users[i].password === pass) {
+      user = users[i]; break;
+    }
+  }
+  if (!user) { showMsg('l-err', '✕ Invalid email or password.'); return; }
+
+  var btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Signing in…';
+
+  setTimeout(function() {
+    saveSession(user);
+    logEvent('User ' + user.first + ' ' + user.last + ' signed in');
+    showMsg('l-ok', '✓ Welcome back, ' + user.first + '! Redirecting…');
+    setTimeout(function() {
+      window.location.href = (user.role === 'SuperAdmin') ? 'admin_control.html' : 'dashboard.html';
+    }, 700);
+  }, 800);
+}
+
+// ── Register ───────────────────────────────────────
+function doRegister() {
+  clearMsgs();
+  var first  = document.getElementById('r-first').value.trim();
+  var last   = document.getElementById('r-last').value.trim();
+  var email  = document.getElementById('r-email').value.trim();
+  var phone  = document.getElementById('r-phone').value.trim();
+  var pass   = document.getElementById('r-pass').value;
+  var conf   = document.getElementById('r-conf').value;
+  var terms  = document.getElementById('r-terms').checked;
+  var roleEl = document.querySelector('input[name="role"]:checked');
+  var role   = roleEl ? roleEl.value : 'Viewer';
+
+  if (!first || !last)             { showMsg('r-err', '⚠ Enter your full name.');              return; }
+  if (!email || !email.includes('@')){ showMsg('r-err', '⚠ Enter a valid email address.');    return; }
+  if (pass.length < 6)             { showMsg('r-err', '⚠ Password must be 6+ characters.');   return; }
+  if (pass !== conf)               { showMsg('r-err', '⚠ Passwords do not match.');            return; }
+  if (!terms)                      { showMsg('r-err', '⚠ Please agree to the Terms.');         return; }
+
+  var users = getUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email.toLowerCase() === email.toLowerCase()) {
+      showMsg('r-err', '⚠ That email is already registered.'); return;
+    }
+  }
+
+  var btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Creating account…';
+
+  setTimeout(function() {
+    var newUser = {
+      id: Date.now(), first: first, last: last,
+      email: email, phone: phone, role: role,
+      password: pass, created: new Date().toISOString()
+    };
+    users.push(newUser);
+    saveUsers(users);
+    saveSession(newUser);
+    logEvent('New account: ' + first + ' ' + last + ' (' + role + ')');
+    showMsg('r-ok', '✓ Account created! Welcome, ' + first + '. Redirecting…');
+    setTimeout(function() {
+      window.location.href = (user.role === 'SuperAdmin') ? 'admin_control.html' : 'dashboard.html';
+    }, 700);
+  }, 900);
+}
+
+// ── User select (already logged in) ───────────────
+function showUserSelect() {
+  var users = getUsers();
+  if (!users.length) return;
+
+  document.getElementById('pane-login').style.display    = 'none';
+  document.getElementById('pane-register').style.display = 'none';
+  document.getElementById('pane-users').style.display    = 'block';
+  document.getElementById('tab-login').classList.remove('active');
+  document.getElementById('tab-register').classList.remove('active');
+
+  var pills = document.getElementById('user-pills');
+  pills.innerHTML = '';
+  users.forEach(function(u) {
+    var ini = (u.first.charAt(0) + u.last.charAt(0)).toUpperCase();
+    var div = document.createElement('div');
+    div.className = 'user-pill';
+    div.innerHTML =
+      '<div class="u-avatar">' + ini + '</div>' +
+      '<div style="flex:1"><div class="u-name">' + u.first + ' ' + u.last + '</div>' +
+      '<div class="u-role">' + u.role + ' · ' + u.email + '</div></div>' +
+      '<span style="color:var(--muted);font-size:18px">→</span>';
+    div.onclick = function() { loginAs(u.id); };
+    pills.appendChild(div);
+  });
+}
+
+function loginAs(id) {
+  var users = getUsers();
+  var user  = null;
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id === id) { user = users[i]; break; }
+  }
+  if (!user) return;
+  saveSession(user);
+  logEvent(user.first + ' ' + user.last + ' signed in');
+  window.location.href = (user.role === 'SuperAdmin') ? 'admin_control.html' : 'dashboard.html';
+}
+
+// ── Forgot password ────────────────────────────────
+function forgotPass() {
+  var email = document.getElementById('l-email').value.trim();
+  if (!email) { showMsg('l-err', '⚠ Enter your email address first.'); return; }
+  var users = getUsers();
+  var user  = null;
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email.toLowerCase() === email.toLowerCase()) { user = users[i]; break; }
+  }
+  if (!user) { showMsg('l-err', '⚠ No account found with that email.'); return; }
+  showMsg('l-ok', 'ℹ Password hint: "' + user.password + '" (demo mode)');
+}
+
+// ── Helpers ────────────────────────────────────────
+function togglePwd(id, btn) {
+  var el = document.getElementById(id);
+  el.type = (el.type === 'password') ? 'text' : 'password';
+  btn.textContent = (el.type === 'password') ? '👁' : '🙈';
+}
+
+function pickRole(el) {
+  document.querySelectorAll('.role-card').forEach(function(c) { c.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+
+function checkStr(val) {
+  var s = 0;
+  if (val.length >= 6) s++;
+  if (val.length >= 10) s++;
+  if (/[A-Z]/.test(val) && /[0-9]/.test(val)) s++;
+  if (/[^A-Za-z0-9]/.test(val)) s++;
+  var cols = ['var(--danger)','var(--warning)','var(--accent2)','var(--accent)'];
+  var lbls = ['Too weak','Weak','Good','Strong'];
+  ['sb1','sb2','sb3','sb4'].forEach(function(id, i) {
+    document.getElementById(id).style.background = (i < s) ? cols[s-1] : 'var(--surface2)';
+  });
+  var lbl = document.getElementById('slbl');
+  lbl.style.color = (s > 0) ? cols[s-1] : 'var(--muted)';
+  lbl.textContent = (s > 0) ? lbls[s-1] : 'Enter a password';
+}
+</script>
+</body>
+</html>

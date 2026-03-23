@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — CRM / Leads</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.pipeline {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:18px;
+}
+.pipeline-col {
+  background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px;
+  min-height:120px;
+}
+.pipeline-col-title {
+  font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+  font-family:var(--mono); color:var(--muted); margin-bottom:12px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.pipeline-count {
+  background:var(--surface2); border-radius:20px; padding:2px 8px; font-size:11px;
+}
+.pipeline-card {
+  background:var(--surface2); border:1px solid var(--border); border-radius:7px;
+  padding:10px 12px; margin-bottom:8px; font-size:12px; cursor:pointer;
+  transition:all .15s;
+}
+.pipeline-card:hover { border-color:var(--accent); }
+.pipeline-card .pc-name { font-weight:600; margin-bottom:3px; }
+.pipeline-card .pc-val  { color:var(--accent); font-family:var(--mono); }
+</style>
+<!-- MOBILE_PATCH -->
+<style>
+@media(max-width:768px){
+  .pipeline { grid-template-columns:1fr !important; gap:10px; }
+  .pipeline-col { min-height:auto; }
+  #crm-search, #crm-stage-filter, #crm-view-toggle { width:100%; }
+  .lead-actions select { width:auto; flex:1; }
+}
+</style>
+</head>
+<body>
+<div id="offline-banner">⚠ OFFLINE MODE — changes are being cached locally</div>
+
+<nav class="navbar">
+  <div class="logo">LEXMO <span>SOLAR</span> // CMD</div>
+  <div class="nav-status">
+    <span><span class="online-dot"></span><span id="conn-status">Online</span></span>
+    <span class="admin-badge">👤 <span id="nav-username">—</span> · <span id="nav-role" style="color:var(--accent);font-size:11px">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">CRM / LEADS</div>
+      <div class="page-sub">Manage customers and sales pipeline · <span id="clock"></span></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="form-row" style="justify-content:space-between;align-items:center">
+      <div class="form-row" style="margin:0">
+        <input type="text" id="crm-search" placeholder="Search leads…" oninput="filterLeads()">
+        <select id="crm-stage-filter" onchange="filterLeads()">
+          <option value="">All Stages</option>
+          <option>Prospect</option><option>Quoted</option><option>Negotiating</option>
+          <option>Won</option><option>Lost</option>
+        </select>
+        <select id="crm-view-toggle" onchange="renderView()">
+          <option value="list">List View</option>
+          <option value="pipeline">Pipeline View</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('add-lead-modal')">+ Add Lead</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid-4">
+      <div class="card"><div class="card-title">Total Leads</div><div class="big-number" id="crm-total">—</div></div>
+      <div class="card"><div class="card-title">Prospects</div><div class="big-number" style="color:var(--accent2)" id="crm-prospect">—</div></div>
+      <div class="card"><div class="card-title">Quoted</div><div class="big-number" style="color:var(--warning)" id="crm-quoted">—</div></div>
+      <div class="card"><div class="card-title">Won</div><div class="big-number" style="color:var(--accent)" id="crm-won">—</div></div>
+    </div>
+
+    <!-- Pipeline / List view -->
+    <div id="view-container"></div>
+  </main>
+</div>
+
+<!-- Add Lead Modal -->
+<div class="modal-overlay" id="add-lead-modal">
+  <div class="modal">
+    <div class="modal-title">+ ADD LEAD</div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Customer Name</label><input type="text" id="lead-name"></div>
+      <div class="form-group" style="flex:1"><label>Phone</label><input type="tel" id="lead-phone" placeholder="+260 9XX XXX XXX"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Location</label><input type="text" id="lead-location" placeholder="e.g. Lusaka, Ndola"></div>
+      <div class="form-group" style="flex:1"><label>Stage</label>
+        <select id="lead-stage"><option>Prospect</option><option>Quoted</option><option>Negotiating</option><option>Won</option><option>Lost</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Product Interest</label><input type="text" id="lead-product" placeholder="e.g. Hybrid Pump + Battery"></div>
+      <div class="form-group" style="flex:1"><label>Est. Value (K)</label><input type="number" id="lead-value" min="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('add-lead-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addLead()">Add Lead</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="store.js"></script>
+<script src="shell.js"></script>
+<script>
+const stageMap = {Prospect:'badge-blue',Quoted:'badge-yellow',Negotiating:'badge-yellow',Won:'badge-green',Lost:'badge-red'};
+const stages   = ['Prospect','Quoted','Negotiating','Won','Lost'];
+
+document.addEventListener('DOMContentLoaded', () => {
+  initNavbar();
+  renderShell('crm');
+  renderView();
+});
+function onStoreUpdate(key){ if(key==='leads') renderView(); }
+
+function getFiltered() {
+  const q     = document.getElementById('crm-search').value.toLowerCase();
+  const stage = document.getElementById('crm-stage-filter').value;
+  const leads = storeGet('leads')||[];
+  return leads.filter(l =>
+    (l.name.toLowerCase().includes(q)||l.location.toLowerCase().includes(q)) &&
+    (!stage || l.stage===stage)
+  );
+}
+
+function filterLeads() { renderView(); }
+
+function renderView() {
+  const leads   = storeGet('leads')||[];
+  const display = getFiltered();
+  const view    = document.getElementById('crm-view-toggle').value;
+
+  // Stats (always full leads)
+  document.getElementById('crm-total').textContent    = leads.length;
+  document.getElementById('crm-prospect').textContent = leads.filter(l=>l.stage==='Prospect').length;
+  document.getElementById('crm-quoted').textContent   = leads.filter(l=>l.stage==='Quoted').length;
+  document.getElementById('crm-won').textContent      = leads.filter(l=>l.stage==='Won').length;
+
+  if(view==='pipeline') renderPipeline(display);
+  else                  renderList(display);
+}
+
+function renderList(display) {
+  const container = document.getElementById('view-container');
+  if(!display.length){ container.innerHTML='<p style="color:var(--muted);font-size:13px;padding:10px 0">No leads found.</p>'; return; }
+  container.innerHTML = display.map(l=>`
+    <div class="lead-card">
+      <div>
+        <div class="lead-name">${l.name} <span class="badge ${stageMap[l.stage]||'badge-blue'}" style="margin-left:8px">${l.stage}</span></div>
+        <div class="lead-meta">📍 ${l.location} · 📞 ${l.phone} · ${l.product} · <strong style="color:var(--accent)">K${l.value.toLocaleString()}</strong></div>
+      </div>
+      <div class="lead-actions">
+        <select class="btn btn-outline btn-sm" onchange="updateStage(${l.id},this.value)" style="padding:5px 8px">
+          ${stages.map(s=>`<option ${s===l.stage?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="quoteForLead(${l.id})" title="Open quote builder">📄</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLead(${l.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderPipeline(display) {
+  const container = document.getElementById('view-container');
+  const cols = stages.map(stage => {
+    const items = display.filter(l=>l.stage===stage);
+    const total = items.reduce((a,l)=>a+l.value,0);
+    return `<div class="pipeline-col">
+      <div class="pipeline-col-title">
+        ${stage}
+        <span class="pipeline-count">${items.length}</span>
+      </div>
+      ${items.map(l=>`
+        <div class="pipeline-card" onclick="">
+          <div class="pc-name">${l.name}</div>
+          <div style="color:var(--muted);font-size:11px;margin-bottom:4px">${l.product}</div>
+          <div class="pc-val">K${l.value.toLocaleString()}</div>
+        </div>`).join('')}
+      ${items.length?`<div style="font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--mono)">Total: K${total.toLocaleString()}</div>`:''}
+    </div>`;
+  }).join('');
+  container.innerHTML = `<div class="pipeline">${cols}</div>`;
+}
+
+function updateStage(id, stage) {
+  const leads= storeGet('leads')||[];
+  const lead = leads.find(l=>l.id===id); if(!lead) return;
+  lead.stage = stage;
+  storeSet('leads', leads);
+  renderView();
+  toast(lead.name+' → '+stage);
+  logEvent('Lead stage: '+lead.name+' → '+stage);
+}
+
+function deleteLead(id) {
+  let leads= storeGet('leads')||[];
+  const lead= leads.find(l=>l.id===id);
+  leads = leads.filter(l=>l.id!==id);
+  storeSet('leads', leads);
+  renderView();
+  toast('Lead removed');
+  if(lead) logEvent('Lead deleted: '+lead.name);
+}
+
+function quoteForLead(id) {
+  const leads= storeGet('leads')||[];
+  const lead = leads.find(l=>l.id===id); if(!lead) return;
+  // Pre-fill quote customer and navigate
+  sessionStorage.setItem('quote_prefill', JSON.stringify({customer:lead.name, contact:lead.phone}));
+  window.location.href='quotes.html';
+}
+
+function addLead() {
+  const name= document.getElementById('lead-name').value.trim();
+  if(!name){ toast('⚠ Customer name required','err'); return; }
+  const leads= storeGet('leads')||[];
+  leads.push({
+    id:       getNextId(),
+    name,
+    phone:    document.getElementById('lead-phone').value,
+    location: document.getElementById('lead-location').value,
+    stage:    document.getElementById('lead-stage').value,
+    product:  document.getElementById('lead-product').value,
+    value:    parseFloat(document.getElementById('lead-value').value)||0,
+  });
+  storeSet('leads', leads);
+  closeModal('add-lead-modal');
+  renderView();
+  toast('✓ Lead added: '+name);
+  logEvent('New lead: '+name);
+  document.getElementById('lead-name').value='';
+}
+</script>
+</body>
+</html>

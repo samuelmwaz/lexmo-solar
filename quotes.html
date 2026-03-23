@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — Quote Builder</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.saved-quote-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 14px; background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; margin-bottom:8px; font-size:13px;
+}
+.saved-quote-row:hover { border-color:var(--accent); }
+</style>
+<!-- MOBILE_PATCH -->
+<style>
+@media(max-width:768px){
+  .grid-2 { grid-template-columns:1fr !important; }
+  #q-qty, #q-price { width:100%; }
+  .saved-quote-row { flex-direction:column; align-items:flex-start; gap:8px; }
+  .saved-quote-row > div:last-child { width:100%; justify-content:space-between; }
+}
+</style>
+</head>
+<body>
+<div id="offline-banner">⚠ OFFLINE MODE — changes are being cached locally</div>
+
+<nav class="navbar">
+  <div class="logo">LEXMO <span>SOLAR</span> // CMD</div>
+  <div class="nav-status">
+    <span><span class="online-dot"></span><span id="conn-status">Online</span></span>
+    <span class="admin-badge">👤 <span id="nav-username">—</span> · <span id="nav-role" style="color:var(--accent);font-size:11px">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">QUOTE BUILDER</div>
+      <div class="page-sub">Generate client quotes and proposals · <span id="clock"></span></div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Customer details -->
+      <div class="card">
+        <div class="card-title">Customer Details</div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Customer Name</label>
+          <input type="text" id="q-customer" placeholder="e.g. Mwamba Farms">
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Phone / Email</label>
+          <input type="text" id="q-contact" placeholder="e.g. +260 9XX XXX XXX">
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Location</label>
+          <input type="text" id="q-location" placeholder="e.g. Lusaka">
+        </div>
+        <div class="form-group">
+          <label>Notes / Requirements</label>
+          <textarea id="q-notes" placeholder="Installation site, special requirements…"></textarea>
+        </div>
+      </div>
+
+      <!-- Add product -->
+      <div class="card">
+        <div class="card-title">Add Product to Quote</div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Product</label>
+          <select id="q-product"><option value="">Select product…</option></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>Qty</label><input type="number" id="q-qty" value="1" min="1"></div>
+          <div class="form-group" style="flex:1"><label>Unit Price (K)</label><input type="number" id="q-price" placeholder="Auto-filled"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label>Discount (%)</label>
+          <input type="number" id="q-discount" value="0" min="0" max="100">
+        </div>
+        <button class="btn btn-primary" onclick="addToQuote()" style="width:100%">+ Add Line</button>
+
+        <!-- Saved quotes -->
+        <div style="margin-top:20px">
+          <div class="card-title">Saved Quotes</div>
+          <div id="saved-quotes-list"><p style="color:var(--muted);font-size:12px">No saved quotes yet.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quote lines -->
+    <div class="card">
+      <div class="card-title">Quote Lines</div>
+      <div id="quote-lines"><p style="color:var(--muted);font-size:13px;padding:10px 0">No items added yet.</p></div>
+      <div class="quote-total">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TOTAL ESTIMATE</div>
+          <div class="big-number" id="quote-total-val">K0</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="clearQuote()">Clear</button>
+          <button class="btn btn-outline" onclick="saveQuote()">💾 Save Quote</button>
+          <button class="btn btn-primary" onclick="printQuote()">🖨 Print / PDF</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+<script src="store.js"></script>
+<script src="shell.js"></script>
+<script>
+let quoteLines = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  initNavbar();
+  renderShell('quotes');
+  populateProducts();
+  loadSavedQuotes();
+
+  // Pre-fill from CRM if navigated from lead
+  const prefill = sessionStorage.getItem('quote_prefill');
+  if(prefill){
+    try{
+      const d=JSON.parse(prefill);
+      if(d.customer) document.getElementById('q-customer').value=d.customer;
+      if(d.contact)  document.getElementById('q-contact').value=d.contact;
+      sessionStorage.removeItem('quote_prefill');
+      toast('✓ Pre-filled from CRM lead');
+    }catch{}
+  }
+});
+
+function onStoreUpdate(key){ if(key==='inventory') populateProducts(); }
+
+function populateProducts(){
+  const sel = document.getElementById('q-product');
+  const inv = storeGet('inventory')||[];
+  sel.innerHTML = '<option value="">Select product…</option>';
+  inv.forEach(i => sel.innerHTML += `<option value="${i.id}" data-price="${i.price}">${i.name} (K${i.price.toLocaleString()})</option>`);
+  sel.onchange = function(){
+    const opt = this.options[this.selectedIndex];
+    document.getElementById('q-price').value = opt.dataset.price||'';
+  };
+}
+
+function addToQuote(){
+  const sel    = document.getElementById('q-product');
+  const prodId = parseInt(sel.value);
+  if(!prodId){ toast('⚠ Select a product','err'); return; }
+  const inv  = storeGet('inventory')||[];
+  const item = inv.find(i=>i.id===prodId); if(!item) return;
+  const qty      = parseInt(document.getElementById('q-qty').value)||1;
+  const price    = parseFloat(document.getElementById('q-price').value)||item.price;
+  const discount = parseFloat(document.getElementById('q-discount').value)||0;
+  const existing = quoteLines.find(l=>l.id===prodId);
+  if(existing){ existing.qty+=qty; }
+  else { quoteLines.push({id:prodId,name:item.name,qty,price,discount}); }
+  renderQuote();
+  toast('✓ Added: '+item.name+' ×'+qty);
+}
+
+function renderQuote(){
+  const container = document.getElementById('quote-lines');
+  if(!quoteLines.length){
+    container.innerHTML='<p style="color:var(--muted);font-size:13px;padding:10px 0">No items added yet.</p>';
+    document.getElementById('quote-total-val').textContent='K0';
+    return;
+  }
+  let total=0;
+  container.innerHTML=`<div class="quote-line" style="color:var(--muted);font-size:11px;font-family:var(--mono)">
+    <span>PRODUCT</span><span>QTY</span><span>UNIT</span><span>SUBTOTAL</span></div>`;
+  quoteLines.forEach((l,i)=>{
+    const discounted = l.price*(1-l.discount/100);
+    const sub  = l.qty*discounted; total+=sub;
+    container.innerHTML+=`<div class="quote-line">
+      <span>${l.name}${l.discount?` <span style="color:var(--warning);font-size:11px">-${l.discount}%</span>`:''}</span>
+      <span><input type="number" value="${l.qty}" min="1" style="width:60px" onchange="updateLine(${i},this.value)"></span>
+      <span>K${discounted.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+      <span style="color:var(--accent)">K${Math.round(sub).toLocaleString()}
+        <button class="btn btn-sm" style="background:transparent;color:var(--danger);padding:0 6px" onclick="removeLine(${i})">✕</button>
+      </span>
+    </div>`;
+  });
+  document.getElementById('quote-total-val').textContent='K'+Math.round(total).toLocaleString();
+}
+
+function updateLine(i,val){ quoteLines[i].qty=Math.max(1,parseInt(val)||1); renderQuote(); }
+function removeLine(i){ quoteLines.splice(i,1); renderQuote(); }
+function clearQuote(){ quoteLines=[]; renderQuote(); toast('Quote cleared'); }
+
+function saveQuote(){
+  if(!quoteLines.length){ toast('⚠ Add items first','err'); return; }
+  const customer = document.getElementById('q-customer').value||'Unnamed';
+  const total    = quoteLines.reduce((a,l)=>a+l.qty*l.price*(1-l.discount/100),0);
+  const savedQ   = JSON.parse(localStorage.getItem('lx_savedQuotes')||'[]');
+  savedQ.unshift({id:Date.now(), customer, total:Math.round(total), lines:[...quoteLines], date:new Date().toISOString().slice(0,10)});
+  if(savedQ.length>20) savedQ.pop();
+  localStorage.setItem('lx_savedQuotes', JSON.stringify(savedQ));
+  loadSavedQuotes();
+  toast('✓ Quote saved for '+customer);
+  logEvent('Quote saved for '+customer+' — K'+Math.round(total).toLocaleString());
+}
+
+function loadSavedQuotes(){
+  const savedQ = JSON.parse(localStorage.getItem('lx_savedQuotes')||'[]');
+  const el     = document.getElementById('saved-quotes-list');
+  if(!savedQ.length){ el.innerHTML='<p style="color:var(--muted);font-size:12px">No saved quotes yet.</p>'; return; }
+  el.innerHTML = savedQ.slice(0,5).map((q,i)=>`
+    <div class="saved-quote-row">
+      <div>
+        <strong>${q.customer}</strong>
+        <span style="color:var(--muted);font-size:11px;margin-left:8px">${q.date}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="color:var(--accent);font-family:var(--mono)">K${q.total.toLocaleString()}</span>
+        <button class="btn btn-outline btn-sm" onclick="loadQuote(${i})">Load</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSaved(${i})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function loadQuote(i){
+  const savedQ = JSON.parse(localStorage.getItem('lx_savedQuotes')||'[]');
+  const q = savedQ[i]; if(!q) return;
+  quoteLines = [...q.lines];
+  document.getElementById('q-customer').value = q.customer;
+  renderQuote();
+  toast('✓ Quote loaded for '+q.customer);
+}
+
+function deleteSaved(i){
+  const savedQ = JSON.parse(localStorage.getItem('lx_savedQuotes')||'[]');
+  savedQ.splice(i,1);
+  localStorage.setItem('lx_savedQuotes', JSON.stringify(savedQ));
+  loadSavedQuotes();
+  toast('Saved quote deleted');
+}
+
+function printQuote(){
+  if(!quoteLines.length){ toast('⚠ Add items first','err'); return; }
+  const customer = document.getElementById('q-customer').value||'Client';
+  const contact  = document.getElementById('q-contact').value||'';
+  const location = document.getElementById('q-location').value||'';
+  const notes    = document.getElementById('q-notes').value||'';
+  const total    = quoteLines.reduce((a,l)=>a+l.qty*l.price*(1-l.discount/100),0);
+  const session  = getSession();
+  const adminName= session?session.first+' '+session.last:'Samuel Mwale';
+  const date     = new Date().toLocaleDateString('en-ZM',{day:'2-digit',month:'long',year:'numeric'});
+  const ref      = 'QT-'+Date.now().toString().slice(-6);
+  const rows     = quoteLines.map(l=>{
+    const discounted = l.price*(1-l.discount/100);
+    const sub        = l.qty*discounted;
+    return `<tr><td>${l.name}</td><td style="text-align:center">${l.qty}</td><td>K${Math.round(discounted).toLocaleString()}</td><td>${l.discount?l.discount+'%':'—'}</td><td><strong>K${Math.round(sub).toLocaleString()}</strong></td></tr>`;
+  }).join('');
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Quote ${ref}</title>
+  <style>
+    body{font-family:'Segoe UI',sans-serif;padding:48px;color:#111;max-width:720px;margin:auto;}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;}
+    .brand{font-size:22px;font-weight:700;color:#007a3d;letter-spacing:1px;}
+    .brand small{font-size:12px;color:#666;font-weight:400;display:block;}
+    .meta{text-align:right;font-size:13px;color:#555;line-height:1.8;}
+    .cust{background:#f0faf5;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:13px;line-height:1.8;}
+    table{width:100%;border-collapse:collapse;margin:20px 0;}
+    th{background:#f0faf5;padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #007a3d;}
+    td{padding:11px 12px;border-bottom:1px solid #eee;font-size:13px;}
+    .total-box{background:#f0faf5;border:2px solid #007a3d;border-radius:8px;padding:16px 24px;text-align:right;float:right;margin-top:8px;}
+    .total-box .lbl{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:1px;}
+    .total-box .val{font-size:26px;font-weight:700;color:#007a3d;}
+    .footer{clear:both;margin-top:60px;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#999;display:flex;justify-content:space-between;}
+    @media print{body{padding:24px;}}
+  </style></head><body>
+  <div class="hdr">
+    <div><div class="brand">LEXMO SOLAR<small>Command Center — Zambia</small></div></div>
+    <div class="meta"><strong>QUOTATION</strong><br>${date}<br>Ref: ${ref}</div>
+  </div>
+  <div class="cust">
+    <strong>Customer:</strong> ${customer}<br>
+    ${contact?`<strong>Contact:</strong> ${contact}<br>`:''}
+    ${location?`<strong>Location:</strong> ${location}<br>`:''}
+    ${notes?`<strong>Notes:</strong> ${notes}`:''}
+  </div>
+  <table>
+    <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="total-box"><div class="lbl">Total Estimate</div><div class="val">K${Math.round(total).toLocaleString()}</div></div>
+  <div class="footer"><span>Generated by Lexmo Solar Command Center</span><span>Admin: ${adminName}</span></div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  toast('✓ Quote sent to printer');
+  logEvent('Quote printed for '+customer+' — K'+Math.round(total).toLocaleString());
+}
+</script>
+</body>
+</html>

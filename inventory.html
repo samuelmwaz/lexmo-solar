@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexmo Solar — Inventory</title>
+<link rel="stylesheet" href="shared.css">
+<!-- MOBILE_PATCH -->
+<style>
+@media(max-width:768px){
+  /* Search + filter + button all stack */
+  #page-inventory .form-row:first-of-type,
+  .form-row[style*="justify-content:space-between"] {
+    flex-direction:column !important; gap:8px;
+  }
+  #inv-search, #inv-cat-filter { width:100%; }
+  .btn.btn-primary { width:100%; justify-content:center; }
+  /* Action buttons in table */
+  td[style*="white-space:nowrap"] { white-space:normal !important; display:flex; flex-wrap:wrap; gap:4px; }
+}
+</style>
+</head>
+<body>
+<div id="offline-banner">⚠ OFFLINE MODE — changes are being cached locally</div>
+
+<nav class="navbar">
+  <div class="logo">LEXMO <span>SOLAR</span> // CMD</div>
+  <div class="nav-status">
+    <span><span class="online-dot"></span><span id="conn-status">Online</span></span>
+    <span class="admin-badge">👤 <span id="nav-username">—</span> · <span id="nav-role" style="color:var(--accent);font-size:11px">—</span></span>
+    <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">INVENTORY</div>
+      <div class="page-sub">Live stock management — solar equipment · <span id="clock"></span></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="form-row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div class="form-row" style="margin:0">
+        <input type="text" id="inv-search" placeholder="Search products…" oninput="filterInventory()">
+        <select id="inv-cat-filter" onchange="filterInventory()">
+          <option value="">All Categories</option>
+          <option>Water Systems</option><option>Storage</option>
+          <option>Generation</option><option>Control</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('add-inv-modal')">+ Add Product</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid-4">
+      <div class="card"><div class="card-title">Total SKUs</div><div class="big-number" id="inv-sku-count">—</div></div>
+      <div class="card"><div class="card-title">Low Stock</div><div class="big-number" style="color:var(--danger)" id="inv-low-count">—</div></div>
+      <div class="card"><div class="card-title">Total Units</div><div class="big-number" id="inv-unit-count">—</div></div>
+      <div class="card"><div class="card-title">Stock Value</div><div class="big-number" style="color:var(--accent)" id="inv-value">—</div></div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>Specs</th><th>Unit Price</th><th>Stock</th><th>Min Stock</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="inv-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal-overlay" id="add-inv-modal">
+  <div class="modal">
+    <div class="modal-title">+ ADD PRODUCT</div>
+    <div class="form-group" style="margin-bottom:10px"><label>Product Name</label><input type="text" id="inv-name" placeholder="e.g. Solar Panel 400W"></div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Category</label>
+        <select id="inv-cat"><option>Water Systems</option><option>Storage</option><option>Generation</option><option>Control</option></select>
+      </div>
+      <div class="form-group" style="flex:1"><label>Specs</label><input type="text" id="inv-specs" placeholder="e.g. 400W, 24V"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Unit Price (K)</label><input type="number" id="inv-price" min="0"></div>
+      <div class="form-group" style="flex:1"><label>Stock Qty</label><input type="number" id="inv-qty" value="1" min="0"></div>
+      <div class="form-group" style="flex:1"><label>Min Stock</label><input type="number" id="inv-min" value="3" min="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('add-inv-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addItem()">Add Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div class="modal-overlay" id="edit-inv-modal">
+  <div class="modal">
+    <div class="modal-title">✏ EDIT PRODUCT</div>
+    <input type="hidden" id="edit-inv-id">
+    <div class="form-group" style="margin-bottom:10px"><label>Product Name</label><input type="text" id="edit-inv-name"></div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Category</label>
+        <select id="edit-inv-cat"><option>Water Systems</option><option>Storage</option><option>Generation</option><option>Control</option></select>
+      </div>
+      <div class="form-group" style="flex:1"><label>Specs</label><input type="text" id="edit-inv-specs"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Unit Price (K)</label><input type="number" id="edit-inv-price"></div>
+      <div class="form-group" style="flex:1"><label>Stock Qty</label><input type="number" id="edit-inv-qty"></div>
+      <div class="form-group" style="flex:1"><label>Min Stock</label><input type="number" id="edit-inv-min"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('edit-inv-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="store.js"></script>
+<script src="shell.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  initNavbar();
+  renderShell('inventory');
+  renderInventory();
+});
+
+function onStoreUpdate(key) { if(key==='inventory') renderInventory(); }
+
+function renderInventory(items) {
+  const inv = storeGet('inventory') || [];
+  const display = items || inv;
+
+  // stats always from full inventory
+  document.getElementById('inv-sku-count').textContent  = inv.length;
+  document.getElementById('inv-low-count').textContent  = inv.filter(i=>i.qty<=i.min).length;
+  document.getElementById('inv-unit-count').textContent = inv.reduce((a,i)=>a+i.qty,0);
+  document.getElementById('inv-value').textContent      = 'K'+inv.reduce((a,i)=>a+i.price*i.qty,0).toLocaleString();
+
+  const tbody = document.getElementById('inv-table');
+  if(!display.length){ tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center">No products found</td></tr>'; return; }
+  tbody.innerHTML = display.map(item => {
+    const low   = item.qty <= item.min;
+    const status= item.qty===0 ? `<span class="badge badge-red">Out of Stock</span>`
+                : low          ? `<span class="badge badge-yellow">Low Stock</span>`
+                               : `<span class="badge badge-green">Available</span>`;
+    return `<tr>
+      <td><strong>${item.name}</strong></td>
+      <td>${item.category}</td>
+      <td style="color:var(--muted)">${item.specs}</td>
+      <td>K${item.price.toLocaleString()}</td>
+      <td><strong style="color:${low?'var(--danger)':'var(--text)'}">${item.qty}</strong></td>
+      <td style="color:var(--muted)">${item.min}</td>
+      <td>${status}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="adjustStock(${item.id},1)">+</button>
+        <button class="btn btn-outline btn-sm" onclick="adjustStock(${item.id},-1)" style="margin-left:4px">−</button>
+        <button class="btn btn-outline btn-sm" onclick="openEdit(${item.id})" style="margin-left:4px">✏</button>
+        <button class="btn btn-danger btn-sm"  onclick="deleteItem(${item.id})" style="margin-left:4px">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterInventory() {
+  const q   = document.getElementById('inv-search').value.toLowerCase();
+  const cat = document.getElementById('inv-cat-filter').value;
+  const inv = storeGet('inventory') || [];
+  renderInventory(inv.filter(i =>
+    (i.name.toLowerCase().includes(q) || i.specs.toLowerCase().includes(q)) &&
+    (!cat || i.category === cat)
+  ));
+}
+
+function adjustStock(id, delta) {
+  const inv  = storeGet('inventory') || [];
+  const item = inv.find(i=>i.id===id); if(!item) return;
+  item.qty   = Math.max(0, item.qty + delta);
+  storeSet('inventory', inv);
+  renderInventory();
+  toast((delta>0?'+1 ':'-1 ')+item.name);
+  logEvent('Stock '+(delta>0?'added to':'removed from')+' '+item.name+' → qty:'+item.qty);
+}
+
+function addItem() {
+  const name = document.getElementById('inv-name').value.trim();
+  if(!name){ toast('⚠ Product name required','err'); return; }
+  const inv = storeGet('inventory') || [];
+  const newItem = {
+    id: getNextId(), name,
+    category: document.getElementById('inv-cat').value,
+    specs:    document.getElementById('inv-specs').value,
+    price:    parseFloat(document.getElementById('inv-price').value)||0,
+    qty:      parseInt(document.getElementById('inv-qty').value)||0,
+    min:      parseInt(document.getElementById('inv-min').value)||3,
+  };
+  inv.push(newItem);
+  storeSet('inventory', inv);
+  closeModal('add-inv-modal');
+  renderInventory();
+  document.getElementById('inv-name').value='';
+  toast('✓ Product added: '+name);
+  logEvent('New product added: '+name);
+}
+
+function openEdit(id) {
+  const inv  = storeGet('inventory')||[];
+  const item = inv.find(i=>i.id===id); if(!item) return;
+  document.getElementById('edit-inv-id').value    = id;
+  document.getElementById('edit-inv-name').value  = item.name;
+  document.getElementById('edit-inv-cat').value   = item.category;
+  document.getElementById('edit-inv-specs').value = item.specs;
+  document.getElementById('edit-inv-price').value = item.price;
+  document.getElementById('edit-inv-qty').value   = item.qty;
+  document.getElementById('edit-inv-min').value   = item.min;
+  openModal('edit-inv-modal');
+}
+
+function saveEdit() {
+  const inv  = storeGet('inventory')||[];
+  const id   = parseInt(document.getElementById('edit-inv-id').value);
+  const item = inv.find(i=>i.id===id); if(!item) return;
+  item.name     = document.getElementById('edit-inv-name').value.trim();
+  item.category = document.getElementById('edit-inv-cat').value;
+  item.specs    = document.getElementById('edit-inv-specs').value;
+  item.price    = parseFloat(document.getElementById('edit-inv-price').value)||0;
+  item.qty      = parseInt(document.getElementById('edit-inv-qty').value)||0;
+  item.min      = parseInt(document.getElementById('edit-inv-min').value)||3;
+  storeSet('inventory', inv);
+  closeModal('edit-inv-modal');
+  renderInventory();
+  toast('✓ Product updated');
+  logEvent('Product edited: '+item.name);
+}
+
+function deleteItem(id) {
+  if(!confirm('Delete this product?')) return;
+  let inv = storeGet('inventory')||[];
+  const item = inv.find(i=>i.id===id);
+  inv = inv.filter(i=>i.id!==id);
+  storeSet('inventory', inv);
+  renderInventory();
+  toast('Product removed');
+  if(item) logEvent('Product deleted: '+item.name);
+}
+</script>
+</body>
+</html>
